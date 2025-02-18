@@ -1,5 +1,9 @@
+import math
+
 from media_cache import ft
 from mp4_helper import dt,ut
+from logger import LogManager
+
 ee = {
     "supports": {
         "mediaSource": True,
@@ -48,6 +52,56 @@ ct = {
     "platform": "windows",
     "safari":None
 }
+re = {
+    "version": "v4.8.22_fix2",
+    "th": 1e3,
+    "eh": 500,
+    "sh": 400
+}
+A = {
+    "Dt": "Player",
+    "Tt": "MSEPlayer",
+    "HttpLoader": "HttpLoader",
+    "xt": "WebSocketLoader",
+    "FlvDemuxer": "FlvDemuxer",
+    "wt": "FlvDemuxerV2",
+    "It": "MSEFlvDemuxer",
+    "AudioDecoder": "AudioDecoder",
+    "VideoDecoder": "VideoDecoder",
+    "At": "AudioContextDecoder",
+    "Mt": "WebVideoDecoder",
+    "bt": "WebAudioDecoder",
+    "Ft": "PcmRender",
+    "Vt": "YuvRender",
+    "Lt": "Controller",
+    "kt": "DataManager",
+    "Rt": "StatusManager",
+    "Ot": "TaskManager",
+    "Ct": "CircularQueue",
+    "Ut": "HlsRemuxer",
+    "Ht": "HlsPlayer",
+    "Wt": "VideoCodecsPlayer",
+    "$t": "DataFlow"
+}
+C = {
+    "od": {
+        "Jh": "mediaSource",
+        "Xh": "mediaSource",
+        "rg": 1000,
+        "ng": 0,
+        "xs": 25,
+        "version": "v4.8.22_fix2"
+    },
+    "extInfo": {
+        "解析绝对时差": None,
+        "校准时差": "NaN",
+        "校准耗时": "267"
+    },
+    "rd": [],
+    "startTime": {
+        "videoFirstFrameTime": 438.5
+    }
+}
 class pt:
     def __init__(self, e, t, i, s, o):
         self.ka = e
@@ -72,7 +126,8 @@ class mt:
         self.VS.append(e)
 
 class yt: #Mp4Remuxer
-    def __init__(self):
+    def __init__(self, logger=None):
+        self.logger = logger
         self.sA = None
         self.lastSample = None
         self.Zs = "Mp4Remuxer"  # 类标识符
@@ -163,36 +218,35 @@ class yt: #Mp4Remuxer
 
     # 处理视频帧的时间戳和关键帧信息
     def lA(self, e):
-        timestamp = e.Ya  # 获取当前帧的时间戳
+        timestamp = e['Ya']  # 获取当前帧的时间戳
 
         # 如果当前帧是关键帧（I帧）
-        if e.Ka:
+        if e['Ka']:
             # 如果 Jm 小于 0，则初始化 Jm 为当前时间戳
             if self.Jm < 0:
                 self.Jm = timestamp
 
             # 如果 rg 为 0，则初始化 rg 为负的时间戳
             if self.rg == 0:
-                self.rg = -e.ka
+                self.rg = -e['ka']
             elif self.rg < 0 and -self.rg != timestamp:
                 # 如果 rg 小于 0 且 rg 的绝对值不等于当前时间戳，则更新 rg 和相关参数
                 self.rg += timestamp
-                self.xs = round(1000 / self.JS.Pa)  # 计算帧率（FPS）
+                self.xs = round(1000 / self.JS['Pa'])  # 计算帧率（FPS）
                 if self.KS:
-                    self.ng = round(-self.ng / self.JS.Pa)  # 计算 B 帧数量
+                    self.ng = round(-self.ng / self.JS['Pa'])  # 计算 B 帧数量
                 else:
                     self.ng = 0
 
-                # 发送 Gop 信息
-                # _.il(X.Yn, None, {
+                #发送 Gop 信息   主要更新了C的信息
+                # _.il("HeadInfo", None, {
                 #     "rg": self.rg,  # Gop 时间（毫秒）
                 #     "ng": self.ng,  # B 帧数量
                 #     "xs": self.xs,  # 帧率（FPS）
-                #     "version": re.version  # 版本号
+                #     "version": re['version']  # 版本号
                 # })
-                #
-                # # 记录 Gop 信息
-                # W.info(A.kt, f"Gop: {self.rg} ms; B frame num: {self.ng}; Fps: {self.xs}")
+                # 记录 Gop 信息
+                self.logger.info(f"Gop: {self.rg} ms; B frame num: {self.ng}; Fps: {self.xs}")
 
         # 如果 Jm 大于 0 且 xs 为 0 且当前时间戳大于 Jm 且 KS 为 false 且 ng 为 0
         if self.Jm > 0 and not self.xs and timestamp > self.Jm and not self.KS and not self.ng:
@@ -211,13 +265,13 @@ class yt: #Mp4Remuxer
                     if self.lastSample:
                         if i.ka == self.lastSample.ka:
                             continue
-                        self.sA.Vr = [self.lastSample]
-                        self.sA.length = self.lastSample.length
-                        self.dA(self.sA, True, i.ka - self.lastSample.ka)
+                        self.sA['Vr'] = [self.lastSample]
+                        self.sA['length'] = self.lastSample['length']
+                        self.dA(self.sA, True, i['ka'] - self.lastSample['ka'])
                     self.sA = t
                     self.lastSample = i
             else:
-                for i in t.Vr:
+                for i in t['Vr']:
                     self.lA(i)
                 self.dA(t, False)
         self.uA(e, False)
@@ -229,7 +283,7 @@ class yt: #Mp4Remuxer
         o = t.codec
         if e == "audio":
             self.YS = t
-            if t.codec == "mp3" and self.eA:
+            if t['codec'] == "mp3" and self.eA:
                 s = "mpeg"
                 o = ""
                 i = bytearray()
@@ -253,10 +307,14 @@ class yt: #Mp4Remuxer
     # 初始化时间戳
     def hA(self, e, t):
         if not self.PS:
-            if e.Vr and len(e.Vr):
-                self.XS = e.Vr[0].ka
-            if t.Vr and len(t.Vr):
-                self.CS = t.Vr[0].ka
+            if e['Vr'] and len(e['Vr']):
+                self.XS = e['Vr'][0]['ka']
+            else:
+                self.XS = 0
+            if t['Vr'] and len(t['Vr']):
+                self.CS = t['Vr'][0]['ka']
+            else:
+                self.CS = 0
             self.LS = min(self.XS, self.CS)
             self.PS = True
 
@@ -294,11 +352,11 @@ class yt: #Mp4Remuxer
         if self.YS is None:
             return
         i, s = None, e
-        o = s.Vr
+        o = s['Vr']
         a = -1
         r = -1
-        n = self.YS.Pa
-        l = self.YS.codec == "mp3" and self.eA
+        n = self.YS['Pa']
+        l = self.YS['codec'] == "mp3" and self.eA
         h = self.PS and self.HS is None
         d = False
         if not o or len(o) == 0 or (len(o) == 1 and not t):
@@ -519,178 +577,156 @@ class yt: #Mp4Remuxer
         })
 
     def dA(self, e, t, i=0):
-        # 如果 JS 为 None，则直接返回
         if self.JS is None:
             return
 
-        s = None  # 时间戳差值
-        o = e  # 当前视频数据对象
-        a = o.Vr  # 视频数据单元数组
-        r = -1  # 第一个样本的起始时间
-        h = -1  # 最后一个样本的结束时间
-        d = -1  # 第一个样本的结束时间
-        u = -1  # 最后一个样本的起始时间
+        s = None
+        o = e
+        a= e['Vr']
+        r, h, d, u = -1, -1, -1, -1
 
-        # 如果视频数据单元数组为空或只有一个元素且不需要处理，则直接返回
         if not a or len(a) == 0 or (len(a) == 1 and not t):
             return
 
-        c = 8  # 初始偏移量
-        p = None  # 最终生成的二进制数据
-        m = 8 + o.length  # 初始数据长度
-        f = None  # 上一个视频数据单元
+        c = 8
+        p = None
+        m = 8 + e['length']
+        f = None
 
-        # 如果视频数据单元数组长度大于1，则移除最后一个数据单元并更新数据长度
         if len(a) > 1:
             f = a.pop()
-            m -= f.length
+            m -= f['length']
 
-        # 如果 US 不为 None，则将其添加到视频数据单元数组开头并更新数据长度
         if self.US is not None:
-            e = self.US
+            e1 = self.US
             self.US = None
-            a.insert(0, e)
-            m += e.length
+            a.insert(0, e1)
+            m += len(e1)
 
-        # 如果 f 不为 None，则将其保存到 US
         if f is not None:
             self.US = f
 
-        # 计算当前视频数据单元的时间戳与 LS 的差值
-        y = a[0].ka - self.LS
+        y = a[0]['ka'] - self.LS
 
-        # 计算时间戳差值 s
         if self.FS:
             s = y - self.FS
         elif self.OS.tm():
             s = 0
         else:
-            e = self.OS.MS(y)
-            if e is not None:
-                t = y - (e.bS + e.duration)
-                if t <= 3:
-                    t = 0
-                s = y - (e.ka + e.duration + t)
+            e2 = self.OS.MS(y)
+            if e2 is not None:
+                t1 = y - (e2['bS'] + e2['duration'])
+                if t1<=3:
+                    t1=0
+                s = y - (e2['ka'] + e2['duration'] + t1)
             else:
                 s = 0
 
-        # 创建一个新的媒体段对象
         b = mt()
-        g = []  # 存储处理后的视频数据单元信息
+        g = []
 
-        # 遍历视频数据单元数组
-        for e in range(len(a)):
-            t = a[e]  # 当前视频数据单元
-            o = t['ka'] - self.LS  # 当前视频数据单元的时间戳与 LS 的差值
-            n = t.Ka  # 是否为关键帧（I帧）
-            l = o - s  # 当前视频数据单元的起始时间
-            h = t.Ya  # 当前视频数据单元的持续时间
-            u = l + h  # 当前视频数据单元的结束时间
+        for e2 in range(len(a)):
+            t2 = a[e2]
+            o1 = t2['ka'] - self.LS
+            n = t2['Ka']
+            l = o1 - s
+            h = t2['Ya']
+            u = l + h
 
-            # 初始化 r 和 d
             if r == -1:
                 r = l
                 d = u
 
-            c = 0  # 当前视频数据单元的持续时间
-
-            # 计算当前视频数据单元的持续时间
-            if e != len(a) - 1:
-                c = a[e + 1].ka - self.LS - s - l
+            ii = 0
+            if e2 != len(a)- 1:
+                ii = a[e2 + 1]['ka'] - self.LS - s - l
             elif f is not None:
-                c = f.ka - self.LS - s - l
+                ii = f['ka'] - self.LS - s - l
             elif len(g) >= 1:
-                c = g[len(g) - 1].duration
+                ii = g[-1]['duration']
             elif i:
-                c = i
+                ii = i
                 s = 0
             else:
-                e = int(self.JS.Pa)
-                t = self.JS.Pa - e
-                c = e + round(t * (self.NS + 1) % 1)
-                self.NS += 1
+                e3 = math.floor(self.JS['Pa'])
+                t2 = self.JS['Pa'] - e3
+                ii = e3 + round(t2 * (++self.NS) % 1)
 
-            # 如果当前视频数据单元是关键帧（I帧），则创建一个新的样本并添加到媒体段对象中
             if n:
-                e = pt(l, u, c, t.ka, True)
-                e.qs = t.qs
-                b.GS(e)
+                e4 = pt(l, u, ii, t2['ka'], True)
+                e4.qs = t2['qs']
+                b.GS(e4)
                 self.NS = 0
 
-            # 将当前视频数据单元的信息添加到 g 数组中
             g.append({
-                "ka": l,  # 起始时间
-                "Va": u,  # 结束时间
-                "Ya": h,  # 持续时间
-                "units": t.units,  # NALU 单元数组
-                "size": t.length,  # 数据长度
-                "Ka": n,  # 是否为关键帧（I帧）
-                "duration": c,  # 持续时间
-                "bS": o,  # 时间戳与 LS 的差值
-                "Xa": t.Xa,  # 北京时间毫秒数
-                "flags": {
-                    "iS": 0,  # 是否为 IDR 帧
-                    "sS": 2 if n else 1,  # 是否为关键帧
-                    "oS": 1 if n else 0,  # 是否为关键帧
-                    "aS": 0,  # 是否为音频帧
-                    "rS": 0 if n else 1  # 是否为非关键帧
+                'ka': l,
+                'Va': u,
+                'Ya': h,
+                'units': t2['units'],
+                'size': t2['length'],
+                'Ka': n,
+                'duration': ii,
+                'bS': o1,
+                'Xa': t2['Xa'],
+                'flags': {
+                    'iS': 0,
+                    'sS': 2 if n else 1,
+                    'oS': 1 if n else 0,
+                    'aS': 0,
+                    'rS': 0 if n else 1
                 }
             })
 
-        # 创建最终的二进制数据
         p = bytearray(m)
         p[0] = (m >> 24) & 255
         p[1] = (m >> 16) & 255
         p[2] = (m >> 8) & 255
-        p[3] = 255 & m
-        p[4:8] = dt.types.mdat
+        p[3] = m & 255
+        p[4:] = bytes(dt.types['mdat'])
 
-        # 将所有 NALU 单元的数据添加到二进制数据中
-        for e in range(len(g)):
-            t = g[e]["units"]
-            while len(t):
-                e_data = t.pop(0).data
-                p[c:c + len(e_data)] = e_data
-                c += len(e_data)
+        for e5 in range(len(g)):
+            t3 = g[e5]['units']
+            while t3:
+                e6 = t3.pop(0)['data']
+                p[c:c + len(e6)] = e6
+                c += len(e6)
 
-        # 更新 h 和 u
-        v = g[len(g) - 1]
-        h = v["ka"] + v["duration"]
-        u = v["Va"] + v["duration"]
+        v = g[-1]
+        h = v['ka'] + v['duration']
+        u = v['Va'] + v['duration']
         self.FS = h
         b.vS = r
         b.SS = h
         b.AS = d
         b.rf = u
-        b.IS = g[0]["bS"]
-        b.kS = v["bS"] + v["duration"]
-        b.mA = pt(g[0]["ka"], g[0]["Va"], g[0]["duration"], g[0]["bS"], g[0]["Ka"])
-        b.lastSample = pt(v["ka"], v["Va"], v["duration"], v["bS"], v["Ka"])
+        b.IS = g[0]['bS']
+        b.kS = v['bS'] + v['duration']
+        b.mA = pt(g[0]['ka'], g[0]['Va'], g[0]['duration'], g[0]['bS'], g[0]['Ka'])
+        b.lastSample = pt(v['ka'], v['Va'], v['duration'], v['bS'], v['Ka'])
+
         if not self.xS:
             self.OS.append(b)
-        o.Vr = g
-        o.kr += 1
+        o['Vr'] = g
+        o['kr'] += 1
         if self.jS:
-            e = g[0]["flags"]
-            e["sS"] = 2
-            e["rS"] = 0
-
-        # 创建 moof 块
+            e4 = g[0]['flags']
+            e4['sS'] = 2
+            e4['rS'] = 0
+        if r<0:
+            r=0
         S = dt.moof(o, r)
-        o.Vr = []
-        o.length = 0
-
-        # 发送视频数据
-        self.zS("video", {
-            "type": "video",
-            "data": self.fA(S, p),
-            "sampleCount": len(g),
-            "info": b,
-            "timeStamp": b.AS,
-            "duration": sum(t["duration"] for t in g),
-            "detail": [dict(t, units=[], flags=None) for t in g]
-        })
-
+        o['Vr'] = []
+        o['length'] = 0
+        the_data =  {
+            'type': "video",
+            'data': self.fA(S, p),
+            'sampleCount': len(g),
+            'info': b,
+            'timeStamp': b.AS,
+            'duration': sum([t['duration'] for t in g]),
+            'detail': [{**t, 'units': [], 'flags': None} for t in g]
+        }
+        self.zS("video",the_data)
     # 合并二进制数据
     def fA(self, e, t):
         i = bytearray(len(e) + len(t))

@@ -5,6 +5,7 @@ import requests
 class bt:
 
     def __init__(self, bind_callback,logger=None, url='https://pl2079.gslxqy.com/live/v2flv_L01_2.flv'):
+        self.logger = logger
         self.gn = None
         self.gA = None
         self.yA = bind_callback  # 回调函数，用于处理解码后的数据
@@ -34,7 +35,7 @@ class bt:
         if self.en:  # 如果是第一次接收到数据
             self.en = False  # 标记已处理首次数据
             self.logger.debug(f"Create MSEFlvDemuxer(), decryptionOption")  # 日志记录
-            self.gn = FLVParser()
+            self.gn = FLVParser(logger=self.logger)
             self.gn.Aa = False  # 设置是否有音频
             self.gn.ma = True  # 设置是否有视频
             self.gn.da = 0  # 初始化解复用器的状态
@@ -42,7 +43,7 @@ class bt:
             self.gn.na = self.er  # 绑定媒体信息回调
             # self.gn.oa = self.tr  # 绑定错误回调
             # self.gn.la = self.ir  # 绑定完成回调
-            self.gA = yt()  # 创建缓冲区管理器
+            self.gA = yt(logger=self.logger)  # 创建缓冲区管理器
             self.gA.ia(self.gn)  # 将解复用器绑定到缓冲区管理器
             self.gA.aA = self.vA  # 绑定视频数据回调
             self.gA.rA = self.SA  # 绑定音频数据回调

@@ -1,5 +1,7 @@
 import logging
 import struct
+import subprocess
+
 import cv2
 import numpy as np
 from amf_parser import parse_script
@@ -7,7 +9,7 @@ from decode_module import DecodeModule
 from data_view import DataView
 from decode_util import cs,St,unsigned_right_shift_32
 
-class FLVParser:
+class FLVParser:  #ht
     """优化的FLV解析器"""
     def __init__(self, e=None, t='all', i=None, logger=None):
         if i is None:
@@ -115,6 +117,8 @@ class FLVParser:
 
         self.Or = i or []  # 支持的 NALU 类型列表
 
+        self.nalu_file = open('temp_nalus.bin', 'ab')
+
     def _check_byte_order(self):
         e = bytearray(2)
         e[0] = 0x01  # 设置为 256 的小端表示
@@ -147,7 +151,9 @@ class FLVParser:
 
     @na.setter
     def na(self, e):
-        self.er = e
+        ## TODO 现在强绑在onMediaInfo上，后续优化
+        if not self.er:
+            self.er = e
 
     @property
     def oa(self):
@@ -253,11 +259,11 @@ class FLVParser:
     def onError(self,msg):
         self.logger.error("onError",msg)
     def onMediaInfo(self,*args):
-        self.logger.info("onMediaInfo",args)
+        self.logger.info("onMediaInfo %s",*args)
     def onTrackMetadata(self,*info):
-        self.logger.info("onTrackMetadata",info)
+        self.logger.info("onTrackMetadata %s",*info)
     def onDataAvailable(self,*info):
-        self.logger.info("onDataAvailable",info)
+        self.logger.info("onDataAvailable %s",*info)
 
     def ra(self, e, t):
         if not (self.Xs and self.er and self.sr and self.rr):
@@ -320,84 +326,14 @@ class FLVParser:
 
             o += 11 + r + 4
 
-        if self.ga() and self.nr:
-            i = self.Ur
-            s = self.Pr
-            if (i is not None and len(i)) or (s is not None and len(s)):
-                self.rr(self.Ur, self.Pr)
+        # if self.ga() and self.nr:
+        i = self.Ur
+        s = self.Pr
+        if (i is not None and len(i)) or (s is not None and len(s)):
+            self.rr(self.Ur, self.Pr)
         return o
     def parse_flv_tags(self, data, byte_start):
         return self.ra(data,byte_start)
-
-    def _parse_flv_tags(self, data, byte_start):
-        """解析 FLV 数据块"""
-        offset = 0
-        little_endian = not self.Ti  # 初始化偏移量和字节序标志
-
-        # 如果是第一次解析数据块（byte_start === 0）
-        if byte_start == 0:
-            # 确保输入缓冲区长度大于13字节，以便进行初步探测
-            if len(data) <= 13:
-                return 0
-
-            # 使用 probe 探测 FLV 文件格式，并获取文件头信息
-            offset = self.flv_header(data)['header_size']  # 获取文件头大小
-        if offset<len(data):
-            offset+=4
-        # 解析 FLV 数据块
-        while offset < len(data):
-            self.nr = True  # 标记正在解析数据块
-
-            # 检查剩余数据是否足够解析一个完整的标签头
-            if offset + 11 + 4 > len(data):
-                break
-
-            i = data[offset:offset + 11 + 4]  # 获取标签头和 PrevTagSize
-
-            # 读取标签类型和数据大小
-            tag_type = i[0]  # 标签类型
-            tag_data_size = struct.unpack('>I' if little_endian else '<I', b'\x00' + i[1:4])[0] & 0xFFFFFF  # 标签数据大小
-
-            # 检查是否有足够的数据来解析整个标签
-            if offset + 11 + tag_data_size + 4 > len(data):
-                break
-
-            # 检查标签类型是否支持
-            if tag_type not in [8, 9, 18]:
-                self.logger.debug(f"Unsupported tag type {tag_type}, skipped")
-                offset += 11 + tag_data_size + 4  # 跳过不支持的标签
-                continue
-
-            # 解析时间戳
-            timestamp = struct.unpack('>I' if little_endian else '<I', i[4:8])[0] & 0xFFFFFF  # 组合时间戳
-
-            # 检查 StreamID 是否为0
-            if struct.unpack('>I' if little_endian else '<I', i[7:11])[0] & 0xFFFFFF:
-                self.logger.debug("Meet tag which has StreamID != 0!")
-
-            tag_data_start = offset + 11  # 计算标签数据的起始位置
-
-            self.logger.info(f"读取到FLV Tag - 类型: ({tag_type}), 大小: {tag_data_size}, 时间戳: {timestamp}")
-            # 根据标签类型处理不同的数据
-            if tag_type == 8:  # 音频标签
-                self.parse_audio_tag(data, tag_data_start, tag_data_size, timestamp)  # 处理音频数据
-            elif tag_type == 9:  # 视频标签
-                self.parse_video_tag(data, tag_data_start, tag_data_size, timestamp, byte_start + offset)  # 处理视频数据
-            elif tag_type == 18:  # 脚本数据标签
-                self.parse_script_data(data, tag_data_start, tag_data_size)  # 处理脚本数据
-
-
-            # 检查 PrevTagSize 是否正确
-            prev_tag_size = struct.unpack('>I' if self.Ti else '<I',
-                                          data[offset + 11 + tag_data_size:offset + 11 + tag_data_size + 4])[0]
-            if prev_tag_size != 11 + tag_data_size:
-                self.logger.debug(f"Invalid PrevTagSize {prev_tag_size}")
-            offset += 11 + tag_data_size + 4  # 更新偏移量以指向下一个标签
-
-        if self.ga() and self.nr and ((self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
-            result = self.rr(self.Ur, self.Pr)
-            return result, offset
-        return offset  # 返回解析的数据长度
 
     def parse_script_data(self, data, data_start, data_size):
         """处理脚本数据"""
@@ -505,8 +441,8 @@ class FLVParser:
             # AVCPacketType 不为 0 或 1，表示无效的视频数据类型
             self.Xs("Flv: Invalid video packet type {}".format(l))
 
-    def Na(self, e, t, i):
-        if i < 7:
+    def Na(self, e, t, length):
+        if length < 7:
             logging.debug("IFlv: Invalid AVCDecoderConfigurationRecord, lack of data!")
             return
 
@@ -523,7 +459,7 @@ class FLVParser:
             if not self.jr and not self.hr:
                 self.jr = True
                 self.Kr.has_video = True
-            a = self.mr = {
+            dd = self.mr = {
                 'type': "",
                 'id': 0,
                 'xa': 0,
@@ -551,12 +487,12 @@ class FLVParser:
                 'Ja': bytearray(0),
                 '_a': bytearray(0),
                 'Pa': 0,
-                'Ca': bytearray(e[t:t + i])
+                'Ca': bytearray(e[t:t + length])
             }
-            a['type'] = "video"
-            a['id'] = r['id']
-            a['xa'] = self.vr
-            a['duration'] = self.yr
+            dd['type'] = "video"
+            dd['id'] = r['id']
+            dd['xa'] = self.vr
+            dd['duration'] = self.yr
 
         # 解析 AVCDecoderConfigurationRecord
         h = l.get_uint8(0)  # 配置版本
@@ -602,25 +538,25 @@ class FLVParser:
                 continue
 
             # 更新视频轨道信息
-            a['Oa'] = h['Ts']['width']  # 显示宽度
-            a['Ha'] = h['Ts']['height']  # 显示高度
-            a['Wa'] = h['Cs']['width']  # 编码宽度
-            a['$a'] = h['Cs']['height']  # 编码高度
-            a['profile'] = h['fs']  # 配置文件
-            a['level'] = h['vs']  # 级别
-            a['za'] = h['ys']  # 限制标志
-            a['Ls'] = h['Ss']  # 序列参数集 ID
-            a['Ga'] = h['Fs']  # 帧大小
-            a['qa'] = h['Es']  # 帧速率信息
+            dd['Oa'] = h['Ts']['width']  # 显示宽度
+            dd['Ha'] = h['Ts']['height']  # 显示高度
+            dd['Wa'] = h['Cs']['width']  # 编码宽度
+            dd['$a'] = h['Cs']['height']  # 编码高度
+            dd['profile'] = h['fs']  # 配置文件
+            dd['level'] = h['vs']  # 级别
+            dd['za'] = h['ys']  # 限制标志
+            dd['Ls'] = h['Ss']  # 序列参数集 ID
+            dd['Ga'] = h['Fs']  # 帧大小
+            dd['qa'] = h['Es']  # 帧速率信息
 
             # 如果帧速率信息无效，则使用默认帧速率信息
             if not h['Es']['fixed'] or h['Es']['Is'] == 0 or h['Es']['bs'] == 0:
-                a['qa'] = self.Sr
+                dd['qa'] = self.Sr
 
             # 计算帧间隔
-            d = a['qa']['bs']
-            u = a['qa']['Is']
-            a['Pa'] = a['xa'] * (d / u)
+            d = dd['qa']['bs']
+            u = dd['qa']['Is']
+            dd['Pa'] = dd['xa'] * (d / u)
 
             # 构建编码器字符串
             f = o[1:4]
@@ -630,27 +566,27 @@ class FLVParser:
                 if len(ti) < 2:
                     ti = "0" + ti
                 y += ti
-            a['codec'] = y
-            a['ja'] = "h264"
+            dd['codec'] = y
+            dd['ja'] = "h264"
 
             # 更新媒体信息
             b = self.Kr
-            b.width = a['Oa']
-            b.height = a['Ha']
-            b.xs = a['qa']['xs']
-            b.profile = a['profile']
-            b.level = a['level']
+            b.width = dd['Oa']
+            b.height = dd['Ha']
+            b.xs = dd['qa']['xs']
+            b.profile = dd['profile']
+            b.level = dd['level']
             b.Bs = h['Ds']
             b.Ls = h['ws']
-            b.Ns = a['Ga']['width']
-            b.Qs = a['Ga']['height']
+            b.Ns = dd['Ga']['width']
+            b.Qs = dd['Ga']['height']
             b.audio_codec = y
             if b.has_audio:
                 if b.audio_codec:
                     b.mime_type = f'video/x-flv; codecs="{b.audio_codec},{b.audio_codec}"'
             else:
                 b.mime_type = f'video/x-flv; codecs="{b.audio_codec}"'
-            if b.Ps():
+            if b.Ps() or True: # 如果媒体信息未初始化，先强制进去看看
                 self.er(b)  # 发送媒体信息
 
         # 获取 PPS（Picture Parameter Set）数量
@@ -664,26 +600,28 @@ class FLVParser:
 
         # 解析每个 PPS
         for _ in range(f):
-            i = l.get_uint16(c)  # 获取 PPS 长度
+            i1 = l.get_uint16(c)  # 获取 PPS 长度
             c += 2
-            if i == 0:
+            if i1 == 0:
                 continue
-            s = e[t + c:t + c + i] # 获取 PPS 数据
+            s = e[t + c:t + c + i1] # 获取 PPS 数据
             r = bytearray(m + p + s)  # 合并 PPS 数据和分隔符
             m = r
-            c += i
+            c += i1
 
         # 更新视频轨道信息
-        a['Ja'] = m
-        a['_a'] = bytearray(e[t:t + i])
-        self.logger.debug(f"Parsed AVCDecoderConfigurationRecord{a}")
+        dd['Ja'] = m
+        dd['_a'][0:length] = bytearray(e[t:t + length])
+        self.logger.debug(f"Parsed AVCDecoderConfigurationRecord{dd}")
 
         # 触发 onDataAvailable 回调（如果有新的音视频数据）
-        if self.ga() and self.nr and ((self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
+        if self.Ur is not None and len(self.Ur) or self.Pr is not None and len(self.Pr):
             self.rr(self.Ur, self.Pr)
         self.nr = False
-        self.sr("video", a)  # 发送轨道元数据
-    #检查是否有可用的数据
+        self.sr("video", dd)  # 发送轨道元数据
+
+
+    #检查是否有可用的数据 //TODO 这里有问题，self.dr没有 同步赋值
     def ga(self):
         if self.lr or self.hr:
             return self.ur or self.dr
@@ -806,24 +744,38 @@ class FLVParser:
 
             e3['Vr'].append(t4)
             e3['length'] += d
-            # 解码并保存帧图片
+
+            # 写入 NALU 单元到文件
             for frame in frames:
                 nalu_data = frame['data']
-                nalu_type = nalu_data[self.pr] & 31
-                if nalu_type == 1:  # I 帧或 P 帧
-                    # 将 NALU 数据转换为字节数组
-                    nalu_bytes = bytes(nalu_data)
-                    # 使用 OpenCV 解码 H.264 帧
-                    nparr = np.frombuffer(nalu_bytes, np.uint8)
-                    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                    if img is not None:
-                        # 保存帧图片
-                        frame_filename = f"images/frame_{timestamp}.jpg"
-                        cv2.imwrite(frame_filename, img)
-                        logging.info(f"Saved frame at timestamp {timestamp} to {frame_filename}")
+                self._write_nalu_to_file(nalu_data)
 
             # 触发 onDataAvailable 回调（如果有新的音视频数据）
-            if self.ga() and self.nr and (
-                    (self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
+            if (self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr)):
                 self.rr(self.Ur, self.Pr)
             self.nr = False
+
+    def _write_nalu_to_file(self, nalu_data):
+        if self.nalu_file is not None:
+            self.nalu_file.write(nalu_data)
+
+
+def convert_nalus_to_h264(nalu_units, output_file):
+    with open(output_file, 'wb') as f:
+        for unit in nalu_units:
+            f.write(unit['data'])
+
+    # 使用 ffmpeg 将 NALU 单元转换为 H.264 编码格式
+    h264_output_file = 'output.h264'
+    command = [
+        'ffmpeg', '-f', 'h264', '-i', output_file, '-c', 'copy', h264_output_file
+    ]
+    subprocess.run(command, check=True)
+
+    return h264_output_file
+
+def write_h264_to_mp4(h264_file, mp4_file):
+    command = [
+        'ffmpeg', '-i', h264_file, '-c', 'copy', mp4_file
+    ]
+    subprocess.run(command, check=True)

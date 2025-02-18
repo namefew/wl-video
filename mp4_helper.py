@@ -253,7 +253,7 @@ class dt:
             0, 0, 0, 0, (t >> 24) & 255, (t >> 16) & 255, (t >> 8) & 255, t & 255
         ]))
         a = dt.sdtp(e)
-        r = dt.trun(e, a[4:])
+        r = dt.trun(e, len(a) + 16 + 16 + 8 + 16 + 8 + 8)
         return dt.qv(dt.types['traf'], s, o, r, a)
 
     @staticmethod
@@ -262,8 +262,8 @@ class dt:
         i = len(t)
         s = bytearray(4 + i)
         for index in range(i):
-            flags = t[index].flags
-            s[index + 4] = (flags.iS << 6) | (flags.sS << 4) | (flags.oS << 2) | flags.aS
+            flags = t[index]['flags']
+            s[index + 4] = (flags['iS'] << 6) | (flags['sS'] << 4) | (flags['oS'] << 2) | flags['aS']
         return dt.qv(dt.types['sdtp'], s)
 
     @staticmethod
@@ -279,15 +279,15 @@ class dt:
             (t >> 24) & 255, (t >> 16) & 255, (t >> 8) & 255, t & 255
         ]
         for index in range(s):
-            duration = i[index].duration
-            size = i[index].size
-            flags = i[index].flags
-            Ya = i[index].Ya
+            duration = int(i[index]['duration'])
+            size = int(i[index]['size'])
+            flags = i[index]['flags']
+            Ya = i[index]['Ya']
             a[12 + 16 * index:12 + 16 * (index + 1)] = [
                 (duration >> 24) & 255, (duration >> 16) & 255, (duration >> 8) & 255, duration & 255,
                 (size >> 24) & 255, (size >> 16) & 255, (size >> 8) & 255, size & 255,
-                (flags.iS << 2) | flags.sS,
-                (flags.oS << 6) | (flags.aS << 4) | flags.rS,
+                (flags['iS'] << 2) | flags['sS'],
+                (flags['oS'] << 6) | (flags['aS'] << 4) | flags['rS'],
                 0, 0,
                 (Ya >> 24) & 255, (Ya >> 16) & 255, (Ya >> 8) & 255, Ya & 255
             ]
