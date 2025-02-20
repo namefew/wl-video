@@ -109,7 +109,7 @@ class bt:
             response = requests.get(url, stream=True)
             response.raise_for_status()
 
-            for chunk in response.iter_content(chunk_size=8192):
+            for chunk in response.iter_content(chunk_size=81920):
                 if chunk:
                     self.pn(chunk)
         except requests.exceptions.RequestException as e:

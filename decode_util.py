@@ -47,14 +47,14 @@ def cs(e):
             i.rs(1)
         if n <= 3:
             l = [0, 420, 422, 444][n]
-            h = i.hs() + 8
-            i.hs()
-            i.rs(1)
-            if i.ns():
-                e = 12 if n == 3 else 8
-                for t in range(e):
-                    if i.ns():
-                        gs(i, 16 if t < 6 else 64)
+        h = i.hs() + 8
+        i.hs()
+        i.rs(1)
+        if i.ns():
+            e1 = 12 if n == 3 else 8
+            for t in range(e1):
+                if i.ns():
+                    gs(i, 16 if t < 6 else 64)
     i.hs()
     d = i.hs()
     if d == 0:
@@ -63,8 +63,8 @@ def cs(e):
         i.rs(1)
         i.us()
         i.us()
-        e = i.hs()
-        for t in range(e):
+        e2 = i.hs()
+        for t in range(e2):
             i.us()
     u = i.hs()
     i.rs(1)
@@ -91,19 +91,19 @@ def cs(e):
     V = 0
     if i.ns():
         if i.ns():
-            e = i.os()
-            if 0 < e < 16:
-                v = [1, 12, 10, 16, 40, 24, 20, 32, 80, 18, 15, 64, 160, 4, 3, 2][e - 1]
-                S = [1, 11, 11, 11, 33, 11, 11, 11, 33, 11, 11, 33, 99, 3, 2, 1][e - 1]
-            elif e == 255:
+            e3 = i.os()
+            if 0 < e3 < 16:
+                v = [1, 12, 10, 16, 40, 24, 20, 32, 80, 18, 15, 64, 160, 4, 3, 2][e3 - 1]
+                S = [1, 11, 11, 11, 33, 11, 11, 11, 33, 11, 11, 33, 99, 3, 2, 1][e3 - 1]
+            elif e3 == 255:
                 v = i.os() << 8 | i.os()
                 S = i.os() << 8 | i.os()
         if i.ns():
             i.ns()
         if i.ns():
             i.rs(4)
-        if i.ns():
-            i.rs(24)
+            if i.ns():
+                i.rs(24)
         if i.ns():
             i.hs()
             i.hs()
@@ -124,7 +124,7 @@ def cs(e):
         Z = 2 - m
     else:
         D = 1 if n == 3 else 2
-        Z = (2 - m) * (1 if n == 1 else 2)
+        Z = (2 - m) * (2 if n == 1 else 1)
     w = 16 * (c + 1)
     R = 16 * (p + 1) * (2 - m)
     w -= (f + y) * D
@@ -263,21 +263,23 @@ class St:
         self.audio_sample_rate = None
         self.us = None
         self.has_video = False
-        self.video_codec = True
+        self.video_codec = None
         self.width = None
         self.height = None
         self.xs = None
         self.profile = None
         self.level = None
-        self.bs = None
         self.ls = None
-        self.ns = None
-        self.qs = None
+        self.Ns = 1
+        self.Qs = 1
+        self.Bs = 1
+        self.Ls = "4:2:0"
         self.mime_type = None
         self.duration = None
         self.metadata = None
-        self._s = None
+        self._s = False
         self.Ws = None
+
 
         # 检查媒体源是否准备好
 
@@ -288,7 +290,7 @@ class St:
 
         # 检查视频相关属性是否已设置
         video_ready = not self.has_video or (
-                self.has_video and self.video_codec is not None and self.width is not None and self.height is not None and self.xs is not None and self.profile is not None and self.level is not None and self.bs is not None and self.ls is not None and self.ns is not None and self.qs is not None)
+                self.has_video and self.video_codec is not None and self.width is not None and self.height is not None and self.xs is not None and self.profile is not None and self.level is not None and self.Bs is not None and self.Ls is not None and self.Ns is not None and self.Qs is not None)
 
         # 检查所有必需的属性是否已设置
         return self.mime_type is not None and self.duration is not None and self.metadata is not None and self._s is not None and audio_ready and video_ready

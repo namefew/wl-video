@@ -1,9 +1,11 @@
 import logging
 import struct
 import subprocess
+import time
 
-import cv2
-import numpy as np
+import av
+
+
 from amf_parser import parse_script
 from decode_module import DecodeModule
 from data_view import DataView
@@ -11,7 +13,7 @@ from decode_util import cs,St,unsigned_right_shift_32
 
 class FLVParser:  #ht
     """优化的FLV解析器"""
-    def __init__(self, e=None, t='all', i=None, logger=None):
+    def __init__(self, e=None, t='All', i=None, logger=None):
         if i is None:
             i = [6]
         if e is None:
@@ -117,7 +119,41 @@ class FLVParser:  #ht
 
         self.Or = i or []  # 支持的 NALU 类型列表
 
-        self.nalu_file = open('temp_nalus.bin', 'ab')
+        self.nalu_file = open('temp_nalus.bin', 'wb')
+        self.on_image_ready = None
+        self.codec_ctx = None
+        self.frame_count = 0
+        self.last_keyframe = None
+        self.crop_region = (400, 300, 400, 300)  # 示例截取区域 (x,y,w,h)
+
+    def _init_decoder(self):
+        """初始化FFmpeg软解码器"""
+        parser = av.CodecContext.create('h264', 'r')
+        parser.extradata = bytearray(self.mr['Ca']+self.mr['Ja'])
+        parser.height = self.mr['Ha']
+        parser.width = self.mr['Oa']
+        self.codec_ctx = {
+            'parser':parser ,
+            'frame_queue': []
+        }
+
+    def _decode_frame(self, nalu_data):
+        """内存解码单个NALU"""
+        try:
+            # 添加起始码并封装AVPacket
+            packet = av.packet.Packet( nalu_data)
+
+            # 送入解码器
+            self.codec_ctx['parser'].decode(packet)
+
+            # 提取解码后的帧
+            while True:
+                frame = self.codec_ctx['parser'].decode()
+                if frame:
+                    return frame.to_ndarray(format='bgr24')
+        except Exception as e:
+            self.logger.error(f"解码失败: {str(e)}")
+            return None
 
     def _check_byte_order(self):
         e = bytearray(2)
@@ -151,7 +187,6 @@ class FLVParser:  #ht
 
     @na.setter
     def na(self, e):
-        ## TODO 现在强绑在onMediaInfo上，后续优化
         if not self.er:
             self.er = e
 
@@ -327,9 +362,7 @@ class FLVParser:  #ht
             o += 11 + r + 4
 
         # if self.ga() and self.nr:
-        i = self.Ur
-        s = self.Pr
-        if (i is not None and len(i)) or (s is not None and len(s)):
+        if self.ga() and self.nr and ((self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
             self.rr(self.Ur, self.Pr)
         return o
     def parse_flv_tags(self, data, byte_start):
@@ -344,14 +377,78 @@ class FLVParser:  #ht
         self.logger.debug(f"ScriptData: {s}")
         # 检查是否存在 onMetaData 字段
         if "onMetaData" in s:
-            meta_data = s["onMetaData"]  # 获取 onMetaData 对象
-
-            # 检查 onMetaData 是否为有效对象
-            if meta_data is None or not isinstance(meta_data, dict):
-                self.logger.debug("Invalid onMetaData structure!")
+            e = s["onMetaData"]
+            if e is None or not isinstance(e, dict):
+                self.logger.debug(self.fi, "Invalid onMetaData structure!")
                 return
-            self.meta_data = meta_data  # 保存当前脚本数据
 
+            if self.cr:
+                self.logger.debug(self.fi, "Found another onMetaData tag!")
+            self.cr = s
+            self.meta_data = e
+            t1 = e
+            if self.tr:
+                self.tr({**t1})  # 发送轨道元数据回调
+
+            if not self.lr:
+                self.Gr = False
+
+            if isinstance(t1.get("has_audio"), bool):
+                if not self.lr:
+                    self.Gr = t1["has_audio"]
+                    self.Kr.has_audio = self.Gr
+
+            if isinstance(t1.get("has_video"), bool):
+                if not self.hr:
+                    self.jr = t1["has_video"]
+                    self.Kr.has_video = self.jr
+
+            if isinstance(t1.get("Hv"), (int, float)):
+                self.Kr.Sa = t1["Hv"]
+
+            if isinstance(t1.get("wa"), (int, float)):
+                self.Kr.Ma = t1["wa"]
+
+            if isinstance(t1.get("width"), (int, float)):
+                self.Kr.width = t1["width"]
+
+            if isinstance(t1.get("height"), (int, float)):
+                self.Kr.height = t1["height"]
+
+            if isinstance(t1.get("duration"), (int, float)):
+                if not self.Dr:
+                    e3 = int(t1["duration"] * self.vr)
+                    self.yr = e3
+                    self.Kr.duration = e3
+            else:
+                self.Kr.duration = 0
+
+            if isinstance(t1.get("Fv"), (int, float)):
+                e = int(1000 * t1["Fv"])
+                if e > 0:
+                    t = e / 1000
+                    self.Sr['fixed'] = True
+                    self.Sr['xs'] = t
+                    self.Sr['Is'] = e
+                    self.Sr['bs'] = 1000
+                    self.Kr.xs = t
+
+            if isinstance(t1.get("Ev"), dict):
+                self.Kr._s = True
+                e = t1["Ev"]
+                self.Kr.Ws = self.Ea(e)  # 假设 Ea 是一个方法
+                t1["Ev"] = None
+            else:
+                self.Kr._s = False
+
+            self.nr = False
+            self.Kr.metadata = t1
+            self.logger.debug("MSEFlvDemuxer", "Parsed onMetaData")
+            if self.Kr.Ps():  # 假设 Ps 是一个方法
+                self.er(self.Kr)
+
+        if len(s) > 0 and self.ir:
+            self.ir({**s})  # 发送数据可用回调
 
 
     def flv_header(self,data):
@@ -487,7 +584,7 @@ class FLVParser:  #ht
                 'Ja': bytearray(0),
                 '_a': bytearray(0),
                 'Pa': 0,
-                'Ca': bytearray(e[t:t + length])
+                'Ca': bytearray(e[t:t + length])  # SPS
             }
             dd['type'] = "video"
             dd['id'] = r['id']
@@ -580,12 +677,12 @@ class FLVParser:  #ht
             b.Ls = h['ws']
             b.Ns = dd['Ga']['width']
             b.Qs = dd['Ga']['height']
-            b.audio_codec = y
+            b.video_codec = y
             if b.has_audio:
                 if b.audio_codec:
-                    b.mime_type = f'video/x-flv; codecs="{b.audio_codec},{b.audio_codec}"'
+                    b.mime_type = f'video/x-flv; codecs="{b.video_codec},{b.audio_codec}"'
             else:
-                b.mime_type = f'video/x-flv; codecs="{b.audio_codec}"'
+                b.mime_type = f'video/x-flv; codecs="{b.video_codec}"'
             if b.Ps() or True: # 如果媒体信息未初始化，先强制进去看看
                 self.er(b)  # 发送媒体信息
 
@@ -610,13 +707,16 @@ class FLVParser:  #ht
             c += i1
 
         # 更新视频轨道信息
-        dd['Ja'] = m
+        dd['Ja'] = m #PPS
         dd['_a'][0:length] = bytearray(e[t:t + length])
         self.logger.debug(f"Parsed AVCDecoderConfigurationRecord{dd}")
-
+        self._init_decoder()    #初始化解码器
         # 触发 onDataAvailable 回调（如果有新的音视频数据）
-        if self.Ur is not None and len(self.Ur) or self.Pr is not None and len(self.Pr):
-            self.rr(self.Ur, self.Pr)
+        if self.ga():
+            if self.nr and ((self.Ur and len(self.Ur)) or (self.Pr and len(self.Pr))):
+                self.rr(self.Ur, self.Pr)
+        else:
+            self.dr = True
         self.nr = False
         self.sr("video", dd)  # 发送轨道元数据
 
@@ -680,53 +780,51 @@ class FLVParser:  #ht
                 elif r > 0:
                     if self._r > 0:
                         self._r -= 1
-                        if self._r < 0.1:
-                            self._r = 0
+                    if self._r < 0.1:
+                        self._r = 0
                     f = "B"
                     if self._r <= 0:
                         self.Br = p
                         self._r = 0
                 else:
                     f = "P"
-            else:
-                f = "P"
             a = bytearray(data[offset + u:offset + u + c + s])  # 读取 NALU 数据
             b = a[c] & 255  # 获取 NALU 数据的第一个字节
 
-            if (b == 65 or b == 97 or b == 101) :
+            if (b == 65 or b == 97 or b == 101) and self.Wr:
                 # data = bytearray(rt.buffer[:a.length])
                 # data[:] = a[:]
                 # self.at(0, c, s)
                 # a[:] = data[:]
-                data = bytearray(self.decoder.memory[0:len(a)])
-                data[:] = a[:]
-                self.decoder.c(0,c, s )
-                a[:] = data[:]
+                # data1 = bytearray(self.decoder.memory[0:len(a)])
+                self.decoder.memory[0:len(a)] = bytearray(a)
+                self.decoder.c(0, c, s)
+                a[:] = bytearray(self.decoder.memory[0:len(a)])
 
             if b == 6 and a[c + 1] == 5 and s == 29:
-                data1 = a[c + 2:c + 4]
-                offset1 = (data1[1] << 8) + data1[0]
+                data2 = a[c + 2:c + 4]
+                offset1 = (data2[1] << 8) + data2[0]
                 i = a[c + 4:c + 4 + 16].decode('utf-8')
                 if offset1 == 24 and i == "BeiJingTimeMsec\0":
                     x = 8
-                    data2 = a[c + 20:c + 20 + x]
+                    data3 = a[c + 20:c + 20 + x]
                     i = 0
                     for jj in range(x):
-                        i += data2[jj] * (2 ** (8 * jj))
+                        i += data3[jj] * (2 ** (8 * jj))
                     y = i
 
             if b not in self.Or:
-                data2 = {
+                data4 = {
                     'type': byte_start,
                     'data': a
                 }
-                frames.append(data2)
+                frames.append(data4)
                 d += len(a)
 
             u += (c + s)
 
         if frames:
-            e3 = self.Pr  # 获取当前视频缓冲区
+            e4 = self.Pr  # 获取当前视频缓冲区
             t4 = {
                 'units': frames,  # NALU 单元数组
                 'length': d,  # 总数据长度
@@ -742,22 +840,67 @@ class FLVParser:  #ht
             if m:
                 t4['qs'] = byte_start
 
-            e3['Vr'].append(t4)
-            e3['length'] += d
+            e4['Vr'].append(t4)
+            e4['length'] += d
 
-            # 写入 NALU 单元到文件
-            for frame in frames:
-                nalu_data = frame['data']
-                self._write_nalu_to_file(nalu_data)
+            # # 写入 NALU 单元到文件
+            # self._write_nalus_to_file(frames, "temp_nalus.bin")
 
-            # 触发 onDataAvailable 回调（如果有新的音视频数据）
-            if (self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr)):
-                self.rr(self.Ur, self.Pr)
-            self.nr = False
+            # 解码 NALU 单元为图片
+            #TODO 需要解码NALU单元为图片
+            for unit in frames:
+                nalu_data = unit['data']
+                nalu_type = nalu_data[self.pr] & 0x1F
 
-    def _write_nalu_to_file(self, nalu_data):
-        if self.nalu_file is not None:
-            self.nalu_file.write(nalu_data)
+                # 关键帧需要携带SPS/PPS
+                if nalu_type == 5 and self.last_keyframe != byte_start:
+                    self._init_decoder()  # 重置解码器
+                    # sps = self.mr['Ca']
+                    # pps = self.mr['Ja']
+                    # frames.insert(0, {'data': sps})
+                    # frames.insert(0, {'data': pps})
+                    self.last_keyframe = byte_start
+
+                # 实时解码
+                if nalu_type in [1, 5]:  # 只处理关键帧和普通帧
+                    frame = self._decode_frame(nalu_data)
+                    self._process_image(frame)
+            # # 触发 onDataAvailable 回调（如果有新的音视频数据）
+            # if (self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr)):
+            #     self.rr(self.Ur, self.Pr)
+            # self.nr = False
+
+    def _process_image(self, image):
+        """图像处理回调（示例）"""
+        if image is not None:
+            # 截取指定区域
+            x, y, w, h = self.crop_region
+            sub_image = image[y:y + h, x:x + w]
+
+            # 触发识别事件（示例）
+            if self.on_image_ready:
+                self.on_image_ready({
+                'timestamp': time.time(),
+                'frame': self.frame_count,
+                'image': sub_image
+                })
+            self.frame_count += 1
+
+    def Ea(self, e):
+        t = []
+        i = []
+        for s in range(1, len(e['zs'])):
+            o = self.gr + int(1000 * e['zs'][s])
+            t.append(o)
+            i.append(e['js'][s])
+        return {
+            'zs': t,
+            'js': i
+        }
+    def _write_nalus_to_file(self,nalu_units, output_file):
+        with open(output_file, 'ab') as f:
+            for unit in nalu_units:
+                f.write(unit['data'])
 
 
 def convert_nalus_to_h264(nalu_units, output_file):
