@@ -12,15 +12,15 @@ filename = f"wl_video_{int(time.time())}.flv"
 def callback(*args):
     if "video" == args[0] and args[1]:
         data = args[1].get('data')
-        detail = args[1].get('detail')
+        # detail = args[1].get('detail')
 
-        if data and detail:
+        if data:
             # 处理数据
             with open(filename, 'ab') as f:
                 f.write(args[1]['data'])
                 logger.info(f"write size:{len(args[1]['data'])}")
         else:
-            print("Missing 'data' or 'detail' in args[1]:", args[1])
+            logger.info(f"Missing 'data' or 'detail' arg[0]={args[0]} arg[1]={args[1]}")
 
 
 

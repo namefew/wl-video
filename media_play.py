@@ -257,64 +257,33 @@ class yt: #Mp4Remuxer
     def oA(self, e, t):
         if not self.zS:
             raise Exception("Mp4Remuxer: onMediaSegment callback must be specificed!")
-        if self.PS or self.hA(e, t):
-            if ee['supports']['videoCodecs']:
-                e = list(t.Vr)
-                for i in e:
-                    self.lA(i)
-                    if self.lastSample:
-                        if i.ka == self.lastSample.ka:
-                            continue
-                        self.sA['Vr'] = [self.lastSample]
-                        self.sA['length'] = self.lastSample['length']
-                        self.dA(self.sA, True, i['ka'] - self.lastSample['ka'])
-                    self.sA = t
-                    self.lastSample = i
-            else:
-                for i in t['Vr']:
-                    self.lA(i)
-                self.dA(t, False)
-        self.uA(e, False)
-
-    # 处理初始化段数据
-    def yn(self, e, t):
-        i = None
-        s = "mp4"
-        o = t.codec
-        if e == "audio":
-            self.YS = t
-            if t['codec'] == "mp3" and self.eA:
-                s = "mpeg"
-                o = ""
-                i = bytearray()
-            else:
-                i = dt.eS(t)
-        elif e == "video":
-            self.JS = t
-            i = dt.eS(t)
+        if not self.PS:
+            self.hA(e, t)
+        if ee['supports']['videoCodecs']:
+            e = list(t['Vr'])
+            for i in e:
+                self.lA(i)
+                if self.lastSample:
+                    if i.ka == self.lastSample.ka:
+                        continue
+                    self.sA['Vr'] = [self.lastSample]
+                    self.sA['length'] = self.lastSample['length']
+                    self.dA(self.sA, True, i['ka'] - self.lastSample['ka'])
+                self.sA = t
+                self.lastSample = i
         else:
-            return
-        if not self.QS:
-            raise Exception("Mp4Remuxer: onInitSegment callback must be specified!")
-        self.QS(e, {
-            "type": e,
-            "data": i,
-            "codec": o,
-            "container": f"{e}/{s}",
-            "cA": t.duration
-        })
+            for i in t['Vr']:
+                self.lA(i)
+            self.dA(t, False)
+        self.uA(e, False)
 
     # 初始化时间戳
     def hA(self, e, t):
         if not self.PS:
             if e['Vr'] and len(e['Vr']):
                 self.XS = e['Vr'][0]['ka']
-            else:
-                self.XS = 0
             if t['Vr'] and len(t['Vr']):
                 self.CS = t['Vr'][0]['ka']
-            else:
-                self.CS = 0
             self.LS = min(self.XS, self.CS)
             self.PS = True
 

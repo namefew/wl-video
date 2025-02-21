@@ -1,8 +1,4 @@
 import struct
-import logging
-
-logger = logging.getLogger(__name__)
-
 
 def parse_script(data, offset, size):
     """解析 AMF 对象属性"""
@@ -89,9 +85,8 @@ def parse_value(data, offset, size):
                 a += result['size']
             case _:
                 a = size
-                logger.debug(f"AMF Unsupported AMF value type {r}")
     except Exception as e:
-        logger.debug(f"AMF {str(e)}")
+        print(f"AMF {str(e)}")
 
     return {
         'data': s,

@@ -45,13 +45,13 @@ def add_header_to_flv(input_file, output_file):
 
 if __name__ == "__main__":
     # 指定输入和输出文件路径
-    input_file = 'wl_video_1739963092.flv'
+    input_file = 'wl_video_1740033596.flv'
     # output_file = 'wl_video_1739869263_with_header.flv'
 
     # 调用函数添加头部信息
     # add_header_to_flv(input_file, output_file)
 
     # # input_file = 'videos/video_1739713504.flv'
-    output_folder = 'videos/wl_video_1739963092'
+    output_folder = 'videos/wl_video_1740033596'
     #
     extract_frames_from_flv(input_file, output_folder)

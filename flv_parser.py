@@ -1,4 +1,3 @@
-import logging
 import struct
 import subprocess
 import time
@@ -7,9 +6,10 @@ import av
 
 
 from amf_parser import parse_script
-from decode_module import DecodeModule
 from data_view import DataView
 from decode_util import cs,St,unsigned_right_shift_32
+from decryption_module import decrypt_function
+
 
 class FLVParser:  #ht
     """优化的FLV解析器"""
@@ -27,11 +27,7 @@ class FLVParser:  #ht
 
         self.jr = None
         self.meta_data = None # 视频元数据
-        self.decoder = DecodeModule()
-        if logger:
-            self.logger = logger
-        else:
-            self.logger = logging.getLogger(__name__)
+        self.logger = logger
         self.Zs = "MSEFlvDemuxer"  # 类名标识符
         self.fi = "A.It"  # 日志模块标识符
         self.Xs = self.onError  # 错误回调函数
@@ -44,8 +40,8 @@ class FLVParser:  #ht
         self.nr = False  # 标记是否正在解析数据块
         self.lr = False  # 标记音频轨道状态
         self.hr = False  # 标记视频轨道状态
-        self.ur = False  # 标记是否有可用的视频数据
-        self.dr = False  # 标记是否有可用的音频数据
+        self.ur = False  # 标记是否有可用的音频数据
+        self.dr = False  # 标记是否有可用的视频数据
         self.cr = None  # 存储脚本数据
         self.Ar = None  # 音频配置
         self.mr = None  # 视频配置
@@ -91,7 +87,7 @@ class FLVParser:  #ht
         self.Or = [6]  # 支持的 NALU 类型
 
         # 日志记录构造函数参数
-        logging.debug(f"constructor, decryptionOption: {t}")
+        self.logger.debug(f"constructor, decryptionOption: {t}")
 
         # 设置解密选项
         if t == "All":
@@ -119,7 +115,6 @@ class FLVParser:  #ht
 
         self.Or = i or []  # 支持的 NALU 类型列表
 
-        self.nalu_file = open('temp_nalus.bin', 'wb')
         self.on_image_ready = None
         self.codec_ctx = None
         self.frame_count = 0
@@ -129,7 +124,7 @@ class FLVParser:  #ht
     def _init_decoder(self):
         """初始化FFmpeg软解码器"""
         parser = av.CodecContext.create('h264', 'r')
-        parser.extradata = bytearray(self.mr['Ca']+self.mr['Ja'])
+        parser.extradata = self.mr['Ca']+self.mr['Ja']
         parser.height = self.mr['Ha']
         parser.width = self.mr['Oa']
         self.codec_ctx = {
@@ -163,7 +158,7 @@ class FLVParser:  #ht
 
     # 设置解密选项
     def ta(self, e, t):
-        logging.debug(f"setDecrypt audio: {e}, video: {t}")
+        self.logger.debug(f"setDecrypt audio: {e}, video: {t}")
         self.Hr = e
         self.Wr = t
 
@@ -316,9 +311,9 @@ class FLVParser:  #ht
         if self.ar:
             self.ar = False
             if t + o != self._r:
-                logging.debug(f"First time parsing but chunk byteStart invalid!")
+                self.logger.debug(f"First time parsing but chunk byteStart invalid!")
             if struct.unpack_from('>I' if a else '<I', e, o)[0] & 0xFFFFFF != 0:
-                logging.debug("PrevTagSize0 !== 0 !!!")
+                self.logger.debug("PrevTagSize0 !== 0 !!!")
             o += 4
 
         while o < len(e):
@@ -335,7 +330,7 @@ class FLVParser:  #ht
                 break
 
             if s not in [8, 9, 18]:
-                logging.debug(f"Unsupported tag type {s}, skipped")
+                self.logger.debug(f"Unsupported tag type {s}, skipped")
                 o += 11 + r + 4
                 continue
 
@@ -344,7 +339,7 @@ class FLVParser:  #ht
             h = i.get_uint8(6) | l << 8 | n << 16 | i.get_uint8(7) << 24
 
             if struct.unpack_from('>I' if a else '<I', e, o + 7)[0] & 0xFFFFFF != 0:
-                logging.debug("Meet tag which has StreamID != 0!")
+                self.logger.debug("Meet tag which has StreamID != 0!")
 
             d = o + 11
 
@@ -357,7 +352,7 @@ class FLVParser:  #ht
 
             u = struct.unpack_from('>I' if a else '<I', e, o + 11 + r)[0]
             if u != 11 + r:
-                logging.debug(f"Invalid PrevTagSize {u}")
+                self.logger.debug(f"Invalid PrevTagSize {u}")
 
             o += 11 + r + 4
 
@@ -443,7 +438,7 @@ class FLVParser:  #ht
 
             self.nr = False
             self.Kr.metadata = t1
-            self.logger.debug("MSEFlvDemuxer", "Parsed onMetaData")
+            self.logger.debug(f"MSEFlvDemuxer Parsed onMetaData {t1}")
             if self.Kr.Ps():  # 假设 Ps 是一个方法
                 self.er(self.Kr)
 
@@ -499,7 +494,7 @@ class FLVParser:  #ht
 
     def ya(self, data, t, i, s, o):
         if i <= 1:
-            logging.debug("Flv: Invalid video packet, missing VideoData payload!")
+            self.logger.debug("Flv: Invalid video packet, missing VideoData payload!")
             return
 
         if self.hr and not self.jr:
@@ -519,7 +514,7 @@ class FLVParser:  #ht
         return self.La(data,offset,size,timestamp,byte_start,frame_type)
     def La(self, data, offset, size, timestamp, byte_start, frame_type):
         if size < 4:
-            logging.debug("Flv: Invalid AVC packet, missing AVCPacketType or/and CompositionTime")
+            self.logger.debug("Flv: Invalid AVC packet, missing AVCPacketType or/and CompositionTime")
             return
 
         r = self.Ti  # 字节序标志（True 表示大端，False 表示小端）
@@ -540,7 +535,7 @@ class FLVParser:  #ht
 
     def Na(self, e, t, length):
         if length < 7:
-            logging.debug("IFlv: Invalid AVCDecoderConfigurationRecord, lack of data!")
+            self.logger.debug("IFlv: Invalid AVCDecoderConfigurationRecord, lack of data!")
             return
 
         a = self.mr  # 当前视频轨道信息
@@ -551,7 +546,7 @@ class FLVParser:  #ht
         # 初始化视频轨道信息（如果尚未初始化）
         if a:
             if hasattr(a, '_a'):
-                logging.debug("Found another AVCDecoderConfigurationRecord!")
+                self.logger.debug("Found another AVCDecoderConfigurationRecord!")
         else:
             if not self.jr and not self.hr:
                 self.jr = True
@@ -612,7 +607,7 @@ class FLVParser:  #ht
             self.Xs("Flv: Invalid AVCDecoderConfigurationRecord: No SPS")
             return
         if u > 1:
-            logging.debug(f"Flv: Strange AVCDecoderConfigurationRecord: SPS Count = {u}")
+            self.logger.debug(f"Flv: Strange AVCDecoderConfigurationRecord: SPS Count = {u}")
 
         c = 6  # 当前解析位置
         p = bytearray([0, 0, 0, 1])  # NALU 分隔符
@@ -692,7 +687,7 @@ class FLVParser:  #ht
             self.Xs("Flv: Invalid AVCDecoderConfigurationRecord: No PPS")
             return
         if f > 1:
-            logging.debug(f"Flv: Strange AVCDecoderConfigurationRecord: PPS Count = {f}")
+            self.logger.debug(f"Flv: Strange AVCDecoderConfigurationRecord: PPS Count = {f}")
         c += 1
 
         # 解析每个 PPS
@@ -746,7 +741,7 @@ class FLVParser:  #ht
 
         while u < size:
             if u + 4 >= size:
-                logging.debug(f"Malformed Nalu near timestamp {p}, offset = {u}, dataSize = {size}")
+                self.logger.debug(f"Malformed Nalu near timestamp {p}, offset = {u}, dataSize = {size}")
                 break
 
             s = l.get_uint32(u,False)  # 读取 NALU 大小
@@ -754,7 +749,7 @@ class FLVParser:  #ht
                 s = unsigned_right_shift_32(s, 8)  # 如果 NALU 头长度为 3，则右移 8 位以获取正确的大小
 
             if s > size - c:
-                logging.debug(f"Malformed Nalus near timestamp {p}, NaluSize > DataSize!")
+                self.logger.debug(f"Malformed Nalus near timestamp {p}, NaluSize > DataSize!")
                 return
 
             nalu_type = l.get_uint8(u + c) & 31  # 获取 NALU 类型
@@ -792,14 +787,7 @@ class FLVParser:  #ht
             b = a[c] & 255  # 获取 NALU 数据的第一个字节
 
             if (b == 65 or b == 97 or b == 101) and self.Wr:
-                # data = bytearray(rt.buffer[:a.length])
-                # data[:] = a[:]
-                # self.at(0, c, s)
-                # a[:] = data[:]
-                # data1 = bytearray(self.decoder.memory[0:len(a)])
-                self.decoder.memory[0:len(a)] = bytearray(a)
-                self.decoder.c(0, c, s)
-                a[:] = bytearray(self.decoder.memory[0:len(a)])
+                a = decrypt_function(a)
 
             if b == 6 and a[c + 1] == 5 and s == 29:
                 data2 = a[c + 2:c + 4]
@@ -815,7 +803,7 @@ class FLVParser:  #ht
 
             if b not in self.Or:
                 data4 = {
-                    'type': byte_start,
+                    'type': nalu_type,
                     'data': a
                 }
                 frames.append(data4)
@@ -847,28 +835,30 @@ class FLVParser:  #ht
             # self._write_nalus_to_file(frames, "temp_nalus.bin")
 
             # 解码 NALU 单元为图片
-            #TODO 需要解码NALU单元为图片
-            for unit in frames:
-                nalu_data = unit['data']
-                nalu_type = nalu_data[self.pr] & 0x1F
-
-                # 关键帧需要携带SPS/PPS
-                if nalu_type == 5 and self.last_keyframe != byte_start:
-                    self._init_decoder()  # 重置解码器
-                    # sps = self.mr['Ca']
-                    # pps = self.mr['Ja']
-                    # frames.insert(0, {'data': sps})
-                    # frames.insert(0, {'data': pps})
-                    self.last_keyframe = byte_start
-
-                # 实时解码
-                if nalu_type in [1, 5]:  # 只处理关键帧和普通帧
-                    frame = self._decode_frame(nalu_data)
-                    self._process_image(frame)
+            #self._handle_nalus(frames, byte_start)
             # # 触发 onDataAvailable 回调（如果有新的音视频数据）
             # if (self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr)):
             #     self.rr(self.Ur, self.Pr)
             # self.nr = False
+    def _handle_nalus(self, frames, byte_start):
+        # TODO 需要解码NALU单元为图片
+        for unit in frames:
+            nalu_data = unit['data']
+            nalu_type = nalu_data[self.pr] & 0x1F
+
+            # 关键帧需要携带SPS/PPS
+            if nalu_type == 5 and self.last_keyframe != byte_start:
+                self._init_decoder()  # 重置解码器
+                # sps = self.mr['Ca']
+                # pps = self.mr['Ja']
+                # frames.insert(0, {'data': sps})
+                # frames.insert(0, {'data': pps})
+                self.last_keyframe = byte_start
+
+            # 实时解码
+            if nalu_type in [1, 5]:  # 只处理关键帧和普通帧
+                frame = self._decode_frame(nalu_data)
+                self._process_image(frame)
 
     def _process_image(self, image):
         """图像处理回调（示例）"""
