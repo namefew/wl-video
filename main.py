@@ -9,9 +9,10 @@ from stream_manager import bt
 logger = LogManager.setup()
 
 # 配置参数
-REGIONS = [(486, 924, 94, 96),  # (x,y,width,height)
+REGIONS_HIGHT = [(486, 924, 94, 96),  # (x,y,width,height)
            (724, 924, 94, 96)]
-
+REGIONS_LOW = [(324,615, 62, 62),  # (x,y,width,height)
+           (483, 615, 62, 62)]
 OUTPUT_DIR = "captured_images"
 # 初始化输出目录
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -75,7 +76,7 @@ def showImages(frame_images):
         if img is not None and img.size > 0:
             # 自动调整窗口大小
             h, w = img.shape[:2]
-            cv2.resizeWindow(f'Region {region_idx + 1}', w, h)
+            cv2.resizeWindow(f'Region {region_idx + 1}', w, h+60)
 
             # 显示图像（BGR格式直接显示）
             cv2.imshow(f'Region {region_idx + 1}', img)
@@ -101,7 +102,9 @@ def get_white_ratio(image, threshold=200):
 
 if __name__ == "__main__":
     logger.info("启动流媒体处理器...")
-    stream_manager = bt(data_callback=None, logger=logger, regions=REGIONS, image_callback=on_image_ready)
-    # 开始拉流
-    stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2.flv')
-    # stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2_l.flv')
+    if False:
+        stream_manager = bt(data_callback=None, logger=logger, regions=REGIONS_HIGHT, image_callback=on_image_ready)
+        stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2.flv')
+    else:
+        stream_manager = bt(data_callback=None, logger=logger, regions=REGIONS_LOW, image_callback=on_image_ready)
+        stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2_l.flv')

@@ -1,8 +1,10 @@
 import struct
 import subprocess
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import av
+import cv2
 import numpy as np
 
 from amf_parser import parse_script
@@ -125,6 +127,11 @@ class FLVParser:  #ht
                                  (724, 924, 94, 96)]
         else:
             self.crop_regions = regions
+        self.executor = ThreadPoolExecutor(max_workers=2)  # 双线程解码
+
+    def _async_decode(self, nalu_data):
+        return self._decode_frame(nalu_data)
+
     def _init_decoder(self):
         """初始化FFmpeg软解码器"""
         try:
@@ -374,8 +381,12 @@ class FLVParser:  #ht
 
         # if self.ga() and self.nr:
         if self.ga() and self.nr and ((self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
+            start_time = time.time()
             self._handle_nalus()
+            end_time = time.time()
+            self.logger.debug(f"handle_nalus cost {(end_time - start_time)*1000} ms")
             self.rr(self.Ur, self.Pr)
+            self.logger.debug(f"mes decoder cost {(time.time() - end_time)*1000} ms")
         return o
     def parse_flv_tags(self, data, byte_start):
         return self.ra(data,byte_start)
@@ -847,14 +858,22 @@ class FLVParser:  #ht
             e4['Vr'].append(t4)
             e4['length'] += d
 
-            # 解码 NALU 单元为图片
-            # self._handle_nalus(t4)
     def _handle_nalus(self):
         nalus = self.Pr['Vr']
-        for nalu in nalus:
-            units = nalu['units']
-            frames = self._decode_frame(units[0]['data'])
+        # 批量拼接所有NAL Units
+        all_nalu_data = bytearray().join(
+            unit['data']
+            for nalu in nalus
+            for unit in nalu['units']
+            if unit['type'] in {1, 5}  # 只处理关键帧和普通帧
+        )
+
+        if all_nalu_data:
+            future = self.executor.submit(self._async_decode, all_nalu_data)
+            frames = future.result()
             self._process_image(frames)
+        # 清空已处理数据
+        self.Pr['Vr'].clear()
 
     @staticmethod
     def captured_regions(frame, regions):
@@ -874,10 +893,13 @@ class FLVParser:  #ht
         return sub_images
 
     def _process_image(self, frames):
+
         """处理解码后的帧集合"""
         if not frames:
             return
         # self.logger.debug(f"解码成功！图像数量：{len(frames)}")
+        if self.frame_count == 0:
+            cv2.imwrite(f'first_frame_{int(time.time())}.jpg', frames[0])
         # 处理每个解码帧
         all_sub_images = []
         for frame in frames:
@@ -890,7 +912,6 @@ class FLVParser:  #ht
             all_sub_images.append(sub_imgs)
             # 保存首帧验证（包括截取区域）
             if self.frame_count == 0:
-                import cv2
                 the_first = all_sub_images[0]
                 cv2.imwrite(f'first_frame_crop0.jpg', the_first[0])
                 cv2.imwrite(f'first_frame_crop1.jpg', the_first[1])
