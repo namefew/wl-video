@@ -239,11 +239,12 @@ class tt:
 
     def ls(self):
         e = 0
-        for e in range(self.ts):
+        while e < self.ts:
             if self.es & unsigned_right_shift_32(2147483648, e):
                 self.es = left_shift_32(self.es, e)
                 self.ts -= e
                 return e
+            e += 1
         self.ss()
         return e + self.ls()
 

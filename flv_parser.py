@@ -140,11 +140,9 @@ class FLVParser:  #ht
         pps = self.mr['Ja']
         extradata = bytes([0x01]) + sps[1:4]  # profile/level等
         extradata += bytes([0xff])  # 6 bits reserved + 2 bits lengthSizeMinusOne
-        extradata += bytes([len(sps)])  # sps count
-        # extradata += bytes([0xe1])  # sps count
+        extradata += bytes([0xe1])  # sps count
         extradata += len(sps).to_bytes(2, 'big') + sps
-        # extradata += bytes([0x01])  # pps count
-        extradata += bytes([len(pps)])  # pps count
+        extradata += bytes([0x01])  # pps count
         extradata += len(pps).to_bytes(2, 'big') + pps
         parser.extradata = extradata
         parser.height = self.mr['Ha']
