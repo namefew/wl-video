@@ -3,7 +3,7 @@ import subprocess
 import time
 
 import av
-
+import numpy as np
 
 from amf_parser import parse_script
 from data_view import DataView
@@ -13,7 +13,7 @@ from decryption_module import decrypt_function
 
 class FLVParser:  #ht
     """优化的FLV解析器"""
-    def __init__(self, e=None, t='All', i=None, logger=None):
+    def __init__(self, e=None, t='All', i=None, logger=None,regions=None,on_image_ready=None):
         if i is None:
             i = [6]
         if e is None:
@@ -115,16 +115,38 @@ class FLVParser:  #ht
 
         self.Or = i or []  # 支持的 NALU 类型列表
 
-        self.on_image_ready = None
+        self.on_image_ready = on_image_ready
         self.codec_ctx = None
         self.frame_count = 0
         self.last_keyframe = None
-        self.crop_region = (400, 300, 400, 300)  # 示例截取区域 (x,y,w,h)
-
+        #w=94 h=92
+        if not regions:
+            self.crop_regions = [(486, 924, 94, 96),  # (x,y,width,height)
+                                 (724, 924, 94, 96)]
+        else:
+            self.crop_regions = regions
     def _init_decoder(self):
         """初始化FFmpeg软解码器"""
-        parser = av.CodecContext.create('h264', 'r')
-        parser.extradata = self.mr['Ca']+self.mr['Ja']
+        try:
+            codec = av.Codec('h264', 'r')
+            # codec = av.Codec('h264_cuvid', 'r')
+            # self.logger.info("成功加载NVIDIA CUVID硬件解码器")
+        except av.FFmpegError:
+            codec = av.Codec('h264', 'r')
+            # self.logger.warning("未找到硬件解码器，回退到软件解码")
+
+        parser = av.CodecContext.create(codec)
+        sps = self.mr['Ca']
+        pps = self.mr['Ja']
+        extradata = bytes([0x01]) + sps[1:4]  # profile/level等
+        extradata += bytes([0xff])  # 6 bits reserved + 2 bits lengthSizeMinusOne
+        extradata += bytes([len(sps)])  # sps count
+        # extradata += bytes([0xe1])  # sps count
+        extradata += len(sps).to_bytes(2, 'big') + sps
+        # extradata += bytes([0x01])  # pps count
+        extradata += bytes([len(pps)])  # pps count
+        extradata += len(pps).to_bytes(2, 'big') + pps
+        parser.extradata = extradata
         parser.height = self.mr['Ha']
         parser.width = self.mr['Oa']
         self.codec_ctx = {
@@ -133,22 +155,18 @@ class FLVParser:  #ht
         }
 
     def _decode_frame(self, nalu_data):
-        """内存解码单个NALU"""
         try:
-            # 添加起始码并封装AVPacket
-            packet = av.packet.Packet( nalu_data)
+            # packet = av.packet.Packet(nalu_data)
+            # 完整处理解码帧队列
+            frames = []
+            for packet in self.codec_ctx['parser'].parse(nalu_data):
+                frames.extend(self.codec_ctx['parser'].decode(packet))
 
-            # 送入解码器
-            self.codec_ctx['parser'].decode(packet)
-
-            # 提取解码后的帧
-            while True:
-                frame = self.codec_ctx['parser'].decode()
-                if frame:
-                    return frame.to_ndarray(format='bgr24')
+            # 返回所有解码帧
+            return [f.to_ndarray(format='bgr24') for f in frames if f]
         except Exception as e:
-            self.logger.error(f"解码失败: {str(e)}")
-            return None
+            self.logger.error(f"解码失败: {str(e)}", exc_info=True)
+            return []
 
     def _check_byte_order(self):
         e = bytearray(2)
@@ -358,6 +376,7 @@ class FLVParser:  #ht
 
         # if self.ga() and self.nr:
         if self.ga() and self.nr and ((self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
+            self._handle_nalus()
             self.rr(self.Ur, self.Pr)
         return o
     def parse_flv_tags(self, data, byte_start):
@@ -753,7 +772,6 @@ class FLVParser:  #ht
                 return
 
             nalu_type = l.get_uint8(u + c) & 31  # 获取 NALU 类型
-
             if nalu_type == 5:
                 m = True
                 self.Br = p
@@ -831,50 +849,61 @@ class FLVParser:  #ht
             e4['Vr'].append(t4)
             e4['length'] += d
 
-            # # 写入 NALU 单元到文件
-            # self._write_nalus_to_file(frames, "temp_nalus.bin")
-
             # 解码 NALU 单元为图片
-            #self._handle_nalus(frames, byte_start)
-            # # 触发 onDataAvailable 回调（如果有新的音视频数据）
-            # if (self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr)):
-            #     self.rr(self.Ur, self.Pr)
-            # self.nr = False
-    def _handle_nalus(self, frames, byte_start):
-        # TODO 需要解码NALU单元为图片
-        for unit in frames:
-            nalu_data = unit['data']
-            nalu_type = nalu_data[self.pr] & 0x1F
+            # self._handle_nalus(t4)
+    def _handle_nalus(self):
+        nalus = self.Pr['Vr']
+        for nalu in nalus:
+            units = nalu['units']
+            frames = self._decode_frame(units[0]['data'])
+            self._process_image(frames)
 
-            # 关键帧需要携带SPS/PPS
-            if nalu_type == 5 and self.last_keyframe != byte_start:
-                self._init_decoder()  # 重置解码器
-                # sps = self.mr['Ca']
-                # pps = self.mr['Ja']
-                # frames.insert(0, {'data': sps})
-                # frames.insert(0, {'data': pps})
-                self.last_keyframe = byte_start
+    @staticmethod
+    def captured_regions(frame, regions):
+        """截取多个图像区域"""
+        sub_images = []
+        for (x, y, w, h) in regions:
+            # 确保坐标在图像范围内
+            height, width = frame.shape[:2]
+            x = max(0, min(x, width - 1))
+            y = max(0, min(y, height - 1))
+            w = min(w, width - x)
+            h = min(h, height - y)
 
-            # 实时解码
-            if nalu_type in [1, 5]:  # 只处理关键帧和普通帧
-                frame = self._decode_frame(nalu_data)
-                self._process_image(frame)
+            # 执行截取
+            sub_img = frame[y:y + h, x:x + w]
+            sub_images.append(sub_img)
+        return sub_images
 
-    def _process_image(self, image):
-        """图像处理回调（示例）"""
-        if image is not None:
-            # 截取指定区域
-            x, y, w, h = self.crop_region
-            sub_image = image[y:y + h, x:x + w]
+    def _process_image(self, frames):
+        """处理解码后的帧集合"""
+        if not frames:
+            return
+        # self.logger.debug(f"解码成功！图像数量：{len(frames)}")
+        # 处理每个解码帧
+        all_sub_images = []
+        for frame in frames:
+            # 转换为numpy数组（如果尚未转换）
+            if not isinstance(frame, np.ndarray):
+                frame = np.array(frame)
 
-            # 触发识别事件（示例）
-            if self.on_image_ready:
-                self.on_image_ready({
+            # 截取所有定义区域
+            sub_imgs = self.captured_regions(frame, self.crop_regions)
+            all_sub_images.append(sub_imgs)
+            # 保存首帧验证（包括截取区域）
+            if self.frame_count == 0:
+                import cv2
+                the_first = all_sub_images[0]
+                cv2.imwrite(f'first_frame_crop0.jpg', the_first[0])
+                cv2.imwrite(f'first_frame_crop1.jpg', the_first[1])
+        # 触发图像就绪事件
+        if self.on_image_ready and all_sub_images:
+            self.on_image_ready({
                 'timestamp': time.time(),
-                'frame': self.frame_count,
-                'image': sub_image
-                })
-            self.frame_count += 1
+                'frame_count': self.frame_count,
+                'images': all_sub_images  # 包含所有截取区域的列表
+            })
+        self.frame_count += len(frames)
 
     def Ea(self, e):
         t = []
@@ -887,10 +916,12 @@ class FLVParser:  #ht
             'zs': t,
             'js': i
         }
-    def _write_nalus_to_file(self,nalu_units, output_file):
-        with open(output_file, 'ab') as f:
+    def _write_nalus_to_file(self,nalu_units, output_file,mode='ab'):
+        # start_code = bytearray([0x00, 0x00, 0x00, 0x01])
+        with open(output_file, mode=mode) as f:
             for unit in nalu_units:
-                f.write(unit['data'])
+                # f.write(start_code)  # 写入起始码
+                f.write(unit['data'])  # 写入NALU数据
 
 
 def convert_nalus_to_h264(nalu_units, output_file):

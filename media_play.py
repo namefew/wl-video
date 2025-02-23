@@ -246,7 +246,7 @@ class yt: #Mp4Remuxer
                 #     "version": re['version']  # 版本号
                 # })
                 # 记录 Gop 信息
-                self.logger.info(f"Gop: {self.rg} ms; B frame num: {self.ng}; Fps: {self.xs}")
+                #self.logger.info(f"Gop: {self.rg} ms; B frame num: {self.ng}; Fps: {self.xs}")
 
         # 如果 Jm 大于 0 且 xs 为 0 且当前时间戳大于 Jm 且 KS 为 false 且 ng 为 0
         if self.Jm > 0 and not self.xs and timestamp > self.Jm and not self.KS and not self.ng:
@@ -606,23 +606,23 @@ class yt: #Mp4Remuxer
                 r = l
                 d = u
 
-            ii = 0
+            duration = 0
             if e2 != len(a)- 1:
-                ii = a[e2 + 1]['ka'] - self.LS - s - l
+                duration = a[e2 + 1]['ka'] - self.LS - s - l
             elif f is not None:
-                ii = f['ka'] - self.LS - s - l
+                duration = f['ka'] - self.LS - s - l
             elif len(g) >= 1:
-                ii = g[-1]['duration']
+                duration = g[-1]['duration']
             elif i:
-                ii = i
+                duration = i
                 s = 0
             else:
                 e3 = math.floor(self.JS['Pa'])
                 t2 = self.JS['Pa'] - e3
-                ii = e3 + round(t2 * (++self.NS) % 1)
+                duration = e3 + round(t2 * (++self.NS) % 1)
 
             if n:
-                e4 = pt(l, u, ii, t2['ka'], True)
+                e4 = pt(l, u, duration, t2['ka'], True)
                 e4.qs = t2['qs']
                 b.GS(e4)
                 self.NS = 0
@@ -634,7 +634,7 @@ class yt: #Mp4Remuxer
                 'units': t2['units'],
                 'size': t2['length'],
                 'Ka': n,
-                'duration': ii,
+                'duration': duration,
                 'bS': o1,
                 'Xa': t2['Xa'],
                 'flags': {

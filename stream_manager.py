@@ -1,14 +1,18 @@
+import time
+
 from flv_parser import FLVParser
 from media_play import yt
 import requests
 
 class bt:
 
-    def __init__(self, bind_callback,logger=None, url='https://pl2079.gslxqy.com/live/v2flv_L01_2.flv'):
+    def __init__(self, data_callback=None,image_callback=None,regions=None,logger=None, url='https://pl2079.gslxqy.com/live/v2flv_L01_2.flv'):
         self.logger = logger
         self.gn = None
         self.gA = None
-        self.yA = bind_callback  # 回调函数，用于处理解码后的数据
+        self.yA = data_callback  # 回调函数，用于处理解码后的数据
+        self.image_callback = image_callback
+        self.regions = regions
         self.config = {}  # 配置对象
         self.isPre = False  # 标记是否为预加载
         self.url = url  # 当前流的 URL
@@ -35,7 +39,7 @@ class bt:
         if self.en:  # 如果是第一次接收到数据
             self.en = False  # 标记已处理首次数据
             self.logger.debug(f"Create MSEFlvDemuxer(), decryptionOption")  # 日志记录
-            self.gn = FLVParser(logger=self.logger)
+            self.gn = FLVParser(logger=self.logger,regions=self.regions,on_image_ready=self.image_callback)
             self.gn.Aa = False  # 设置是否有音频
             self.gn.ma = True  # 设置是否有视频
             self.gn.da = 0  # 初始化解复用器的状态
@@ -80,14 +84,14 @@ class bt:
     def rA(self, value):
         self.zS = value
 
-    # 视频数据回调
+    # 音频数据回调
     def vA(self, e, t):
         if self.yA:
             t['isPre'] = self.isPre  # 标记是否为预加载
             t['url'] = self.url  # 设置 URL
             self.yA(e, t)  # 调用回调函数处理数据
 
-    # 音频数据回调
+    # 视频数据回调
     def SA(self, e, t):
         if self.yA:
             t['isPre'] = self.isPre  # 标记是否为预加载
@@ -111,6 +115,8 @@ class bt:
 
             for chunk in response.iter_content(chunk_size=81920):
                 if chunk:
+                    start = time.time()
                     self.pn(chunk)
+                    self.logger.debug(f"Processed chunk in {(time.time() - start)*1000} ms")
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error reading stream from {url}: {e}")

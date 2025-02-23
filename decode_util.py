@@ -208,7 +208,7 @@ class tt:
         t = min(4, e)
         i = bytearray(4)
         i[:t] = self.Yi[self.Zi:self.Zi + t]
-        self.es = int.from_bytes(i, byteorder='big')  # 大端序
+        self.es =int.from_bytes(i, byteorder='big')  # 大端序
         self.Zi += t
         self.ts = 8 * t
 
