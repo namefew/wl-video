@@ -11,6 +11,7 @@ from amf_parser import parse_script
 from data_view import DataView
 from decode_util import cs,St,unsigned_right_shift_32
 from decryption_module import decrypt_function
+from h264_decoder import H264Decoder
 
 
 class FLVParser:  #ht
@@ -117,10 +118,17 @@ class FLVParser:  #ht
 
         self.Or = i or []  # 支持的 NALU 类型列表
 
+        # 创建解码器实例
+        self.decoder = H264Decoder(
+            logger=logger,
+            on_decoded=self._on_frames_decoded,
+            on_error=lambda e: self.Xs(f"Decoder error: {str(e)}")
+        )
+
         self.on_image_ready = on_image_ready
-        self.codec_ctx = None
+        # self.codec_ctx = None
         self.frame_count = 0
-        self.last_keyframe = None
+        # self.last_keyframe = None
         #w=94 h=92
         if not regions:
             self.crop_regions = [(486, 924, 94, 96),  # (x,y,width,height)
@@ -133,31 +141,44 @@ class FLVParser:  #ht
         return self._decode_frame(nalu_data)
 
     def _init_decoder(self):
-        """初始化FFmpeg软解码器"""
-        try:
-            codec = av.Codec('h264', 'r')
-            # codec = av.Codec('h264_cuvid', 'r')
-            # self.logger.info("成功加载NVIDIA CUVID硬件解码器")
-        except av.FFmpegError:
-            codec = av.Codec('h264', 'r')
-            # self.logger.warning("未找到硬件解码器，回退到软件解码")
+        """替换原来的初始化逻辑"""
+        self.decoder.init_decoder(
+            sps=self.mr['Ca'],
+            pps=self.mr['Ja'],
+            width=self.mr['Oa'],
+            height=self.mr['Ha']
+        )
+        #
+        # """初始化FFmpeg软解码器"""
+        # try:
+        #     codec = av.Codec('h264', 'r')
+        #     # codec = av.Codec('h264_cuvid', 'r')
+        #     # self.logger.info("成功加载NVIDIA CUVID硬件解码器")
+        # except av.FFmpegError:
+        #     codec = av.Codec('h264', 'r')
+        #     # self.logger.warning("未找到硬件解码器，回退到软件解码")
+        #
+        # parser = av.CodecContext.create(codec)
+        # sps = self.mr['Ca']
+        # pps = self.mr['Ja']
+        # extradata = bytes([0x01]) + sps[1:4]  # profile/level等
+        # extradata += bytes([0xff])  # 6 bits reserved + 2 bits lengthSizeMinusOne
+        # extradata += bytes([0xe1])  # sps count
+        # extradata += len(sps).to_bytes(2, 'big') + sps
+        # extradata += bytes([0x01])  # pps count
+        # extradata += len(pps).to_bytes(2, 'big') + pps
+        # parser.extradata = extradata
+        # parser.height = self.mr['Ha']
+        # parser.width = self.mr['Oa']
+        # self.codec_ctx = {
+        #     'parser':parser ,
+        #     'frame_queue': []
+        # }
 
-        parser = av.CodecContext.create(codec)
-        sps = self.mr['Ca']
-        pps = self.mr['Ja']
-        extradata = bytes([0x01]) + sps[1:4]  # profile/level等
-        extradata += bytes([0xff])  # 6 bits reserved + 2 bits lengthSizeMinusOne
-        extradata += bytes([0xe1])  # sps count
-        extradata += len(sps).to_bytes(2, 'big') + sps
-        extradata += bytes([0x01])  # pps count
-        extradata += len(pps).to_bytes(2, 'big') + pps
-        parser.extradata = extradata
-        parser.height = self.mr['Ha']
-        parser.width = self.mr['Oa']
-        self.codec_ctx = {
-            'parser':parser ,
-            'frame_queue': []
-        }
+    def _on_frames_decoded(self, frames: list[np.ndarray]):
+        """解码完成事件处理"""
+        if frames:
+            self._process_image(frames)
 
     def _decode_frame(self, nalu_data):
         try:
@@ -869,9 +890,7 @@ class FLVParser:  #ht
         )
 
         if all_nalu_data:
-            future = self.executor.submit(self._async_decode, all_nalu_data)
-            frames = future.result()
-            self._process_image(frames)
+            self.decoder.async_decode(bytes(all_nalu_data))
         # 清空已处理数据
         self.Pr['Vr'].clear()
 

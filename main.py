@@ -102,7 +102,7 @@ def get_white_ratio(image, threshold=200):
 
 if __name__ == "__main__":
     logger.info("启动流媒体处理器...")
-    if False:
+    if True:
         stream_manager = bt(data_callback=None, logger=logger, regions=REGIONS_HIGHT, image_callback=on_image_ready)
         stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2.flv')
     else:
