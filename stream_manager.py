@@ -113,10 +113,10 @@ class bt:
             response = requests.get(url, stream=True)
             response.raise_for_status()
 
-            for chunk in response.iter_content(chunk_size=81920):
+            for chunk in response.iter_content(chunk_size=4096*4):
                 if chunk:
                     start = time.time()
                     self.pn(chunk)
-                    self.logger.debug(f"Processed chunk in {(time.time() - start)*1000} ms")
+                    # self.logger.debug(f"Processed chunk in {(time.time() - start)*1000} ms")
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error reading stream from {url}: {e}")

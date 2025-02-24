@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import cv2
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from logger import LogManager
 from stream_manager import bt
@@ -9,9 +8,9 @@ from stream_manager import bt
 logger = LogManager.setup()
 
 # 配置参数
-REGIONS_HIGHT = [(486, 924, 94, 96),  # (x,y,width,height)
+LongHu_REGIONS_HIGHT = [(486, 924, 94, 96),  # (x,y,width,height)
            (724, 924, 94, 96)]
-REGIONS_LOW = [(324,615, 62, 62),  # (x,y,width,height)
+LongHu_REGIONS_LOW = [(324,615, 62, 62),  # (x,y,width,height)
            (483, 615, 62, 62)]
 OUTPUT_DIR = "captured_images"
 # 初始化输出目录
@@ -46,19 +45,19 @@ def on_image_ready(event):
         if len(frame_images) != 2:
             logger.warning(f"帧 {idx} 的截取区域数量不正确: {len(frame_images)}")
             continue
-
-        white_ratio0 = get_white_ratio(frame_images[0])
-        white_ratio1 = get_white_ratio(frame_images[1])
-
-        if status != 1 and 0.008 < white_ratio0 <= 0.028 and 0.008 < white_ratio1 <= 0.028:
-            executor.submit(showImages, frame_images)
-            status = 1
-        elif status != 2 and 0.028 < white_ratio0 <= 0.6 and 0.028 < white_ratio1 <= 0.6:
-            executor.submit(showImages, frame_images)
-            status = 2
-        elif status != 0 and (0.6 < white_ratio0 and 0.6 < white_ratio1 or white_ratio0 <= 0.008 and white_ratio1 <= 0.008):
-            executor.submit(showImages, frame_images)
-            status = 0
+        executor.submit(showImages, frame_images)
+        # white_ratio0 = get_white_ratio(frame_images[0])
+        # white_ratio1 = get_white_ratio(frame_images[1])
+        #
+        # if status != 1 and 0.008 < white_ratio0 <= 0.028 and 0.008 < white_ratio1 <= 0.028:
+        #     executor.submit(showImages, frame_images)
+        #     status = 1
+        # elif status != 2 and 0.028 < white_ratio0 <= 0.6 and 0.028 < white_ratio1 <= 0.6:
+        #     executor.submit(showImages, frame_images)
+        #     status = 2
+        # elif status != 0 and (0.6 < white_ratio0 and 0.6 < white_ratio1 or white_ratio0 <= 0.008 and white_ratio1 <= 0.008):
+        #     executor.submit(showImages, frame_images)
+        #     status = 0
 
 def showImages(frame_images):
     """使用OpenCV实时显示截取区域"""
@@ -76,7 +75,7 @@ def showImages(frame_images):
         if img is not None and img.size > 0:
             # 自动调整窗口大小
             h, w = img.shape[:2]
-            cv2.resizeWindow(f'Region {region_idx + 1}', w, h+60)
+            cv2.resizeWindow(f'Region {region_idx + 1}', w, h+50)
 
             # 显示图像（BGR格式直接显示）
             cv2.imshow(f'Region {region_idx + 1}', img)
@@ -102,9 +101,33 @@ def get_white_ratio(image, threshold=200):
 
 if __name__ == "__main__":
     logger.info("启动流媒体处理器...")
-    if True:
-        stream_manager = bt(data_callback=None, logger=logger, regions=REGIONS_HIGHT, image_callback=on_image_ready)
-        stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2.flv')
-    else:
-        stream_manager = bt(data_callback=None, logger=logger, regions=REGIONS_LOW, image_callback=on_image_ready)
-        stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2_l.flv')
+    tables = [{'table_id': 8801, 'name': '龙虎',
+               'links': [{'url': 'https://pl2079.gslxqy.com/live/v2flv_L01_2.flv',
+                         'regions': [(486, 924, 94, 96),(724, 924, 94, 96)]},
+                        {'url': 'https://pl2079.gslxqy.com/live/v2flv_L01_2_l.flv',
+                         'regions': [(324, 615, 62, 62), (483, 615, 62, 62)]}
+                        ]
+               },
+              {'table_id': 8802, 'name': '极速B07',
+               'links': [{ 'url': 'https://pl1653.cslyxs.cn/live/v3flv_B07_2.flv',
+                        'regions': [(508-78, 838-82, 78, 80),(508+4, 838-82, 78, 80)]},
+                        {'url': 'https://pl1653.cslyxs.cn/live/v3flv_B07_1.flv',
+                         'regions': [(508-78, 838-82, 78, 80),(508+4, 838-82, 78, 80)]},
+                        {'url': 'https://pl1653.cslyxs.cn/live/v3flv_B07_1_l.flv',
+                         'regions': [(324, 615, 62, 62), (483, 615, 62, 62)]}
+                        ]
+               }]
+    table = tables[1]
+    link = table["links"][1]
+    url = link["url"]
+    regions = link["regions"]
+
+    stream_manager = bt(data_callback=None, logger=logger, regions=regions, image_callback=on_image_ready)
+    stream_manager.direct_stream_reader(url)
+
+    # if True:
+    #     stream_manager = bt(data_callback=None, logger=logger, regions=REGIONS_HIGHT, image_callback=on_image_ready)
+    #     stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2.flv')
+    # else:
+    #     stream_manager = bt(data_callback=None, logger=logger, regions=REGIONS_LOW, image_callback=on_image_ready)
+    #     stream_manager.direct_stream_reader('https://pl2079.gslxqy.com/live/v2flv_L01_2_l.flv')

@@ -3,7 +3,6 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-import av
 import cv2
 import numpy as np
 
@@ -12,6 +11,7 @@ from data_view import DataView
 from decode_util import cs,St,unsigned_right_shift_32
 from decryption_module import decrypt_function
 from h264_decoder import H264Decoder
+from image_processor import RegionCaptureProcessor
 
 
 class FLVParser:  #ht
@@ -125,16 +125,12 @@ class FLVParser:  #ht
             on_error=lambda e: self.Xs(f"Decoder error: {str(e)}")
         )
 
-        self.on_image_ready = on_image_ready
-        # self.codec_ctx = None
-        self.frame_count = 0
-        # self.last_keyframe = None
-        #w=94 h=92
-        if not regions:
-            self.crop_regions = [(486, 924, 94, 96),  # (x,y,width,height)
-                                 (724, 924, 94, 96)]
-        else:
-            self.crop_regions = regions
+        # 替换原有的区域截取相关代码
+        self.image_processor = RegionCaptureProcessor(
+            regions=regions or [(486, 924, 94, 96), (724, 924, 94, 96)],
+            on_image_ready=on_image_ready,
+            logger=logger
+        )
         self.executor = ThreadPoolExecutor(max_workers=2)  # 双线程解码
 
     def _async_decode(self, nalu_data):
@@ -397,17 +393,11 @@ class FLVParser:  #ht
             u = struct.unpack_from('>I' if a else '<I', e, o + 11 + r)[0]
             if u != 11 + r:
                 self.logger.debug(f"Invalid PrevTagSize {u}")
-
             o += 11 + r + 4
 
-        # if self.ga() and self.nr:
         if self.ga() and self.nr and ((self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
-            start_time = time.time()
             self._handle_nalus()
-            end_time = time.time()
-            self.logger.debug(f"handle_nalus cost {(end_time - start_time)*1000} ms")
-            self.rr(self.Ur, self.Pr)
-            self.logger.debug(f"mes decoder cost {(time.time() - end_time)*1000} ms")
+            # self.rr(self.Ur, self.Pr)
         return o
     def parse_flv_tags(self, data, byte_start):
         return self.ra(data,byte_start)
@@ -916,32 +906,7 @@ class FLVParser:  #ht
         """处理解码后的帧集合"""
         if not frames:
             return
-        # self.logger.debug(f"解码成功！图像数量：{len(frames)}")
-        if self.frame_count == 0:
-            cv2.imwrite(f'first_frame_{int(time.time())}.jpg', frames[0])
-        # 处理每个解码帧
-        all_sub_images = []
-        for frame in frames:
-            # 转换为numpy数组（如果尚未转换）
-            if not isinstance(frame, np.ndarray):
-                frame = np.array(frame)
-
-            # 截取所有定义区域
-            sub_imgs = self.captured_regions(frame, self.crop_regions)
-            all_sub_images.append(sub_imgs)
-            # 保存首帧验证（包括截取区域）
-            if self.frame_count == 0:
-                the_first = all_sub_images[0]
-                cv2.imwrite(f'first_frame_crop0.jpg', the_first[0])
-                cv2.imwrite(f'first_frame_crop1.jpg', the_first[1])
-        # 触发图像就绪事件
-        if self.on_image_ready and all_sub_images:
-            self.on_image_ready({
-                'timestamp': time.time(),
-                'frame_count': self.frame_count,
-                'images': all_sub_images  # 包含所有截取区域的列表
-            })
-        self.frame_count += len(frames)
+        self.image_processor.process_frames(frames)
 
     def Ea(self, e):
         t = []
@@ -954,30 +919,3 @@ class FLVParser:  #ht
             'zs': t,
             'js': i
         }
-    def _write_nalus_to_file(self,nalu_units, output_file,mode='ab'):
-        # start_code = bytearray([0x00, 0x00, 0x00, 0x01])
-        with open(output_file, mode=mode) as f:
-            for unit in nalu_units:
-                # f.write(start_code)  # 写入起始码
-                f.write(unit['data'])  # 写入NALU数据
-
-
-def convert_nalus_to_h264(nalu_units, output_file):
-    with open(output_file, 'wb') as f:
-        for unit in nalu_units:
-            f.write(unit['data'])
-
-    # 使用 ffmpeg 将 NALU 单元转换为 H.264 编码格式
-    h264_output_file = 'output.h264'
-    command = [
-        'ffmpeg', '-f', 'h264', '-i', output_file, '-c', 'copy', h264_output_file
-    ]
-    subprocess.run(command, check=True)
-
-    return h264_output_file
-
-def write_h264_to_mp4(h264_file, mp4_file):
-    command = [
-        'ffmpeg', '-i', h264_file, '-c', 'copy', mp4_file
-    ]
-    subprocess.run(command, check=True)
