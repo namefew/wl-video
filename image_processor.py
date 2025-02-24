@@ -76,7 +76,7 @@ class RegionCaptureProcessor:
         """保存首帧验证数据"""
         timestamp = int(time.time())
         for i, img in enumerate(sub_imgs):
-            cv2.imwrite(f'first_frame_crop_{timestamp}.jpg', img)
+            cv2.imwrite(f'first_frame_{timestamp}.jpg', img)
         self.logger.debug("首帧验证图像已保存")
 
     def _trigger_callback(self, all_sub_images: List[List[np.ndarray]]):

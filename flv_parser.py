@@ -567,7 +567,9 @@ class FLVParser:  #ht
             self.Na(data, offset + 4, size - 4)
         elif l == 1:
             # AVCPacketType 为 1，表示 AVC 原始帧数据
+            # start = time.time()
             self.Qa(data, offset + 4, size - 4, timestamp, byte_start, frame_type, h)
+            # self.logger.debug(f"解密视频数据耗时 {(time.time()-start)*1000:.4f} 毫秒")
         elif l != 2:
             # AVCPacketType 不为 0 或 1，表示无效的视频数据类型
             self.Xs("Flv: Invalid video packet type {}".format(l))
@@ -821,7 +823,7 @@ class FLVParser:  #ht
                         self._r = 0
                 else:
                     f = "P"
-            a = bytearray(data[offset + u:offset + u + c + s])  # 读取 NALU 数据
+            a = bytes(data[offset + u:offset + u + c + s])  # 读取 NALU 数据
             b = a[c] & 255  # 获取 NALU 数据的第一个字节
 
             if (b == 65 or b == 97 or b == 101) and self.Wr:
