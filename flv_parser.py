@@ -133,9 +133,6 @@ class FLVParser:  #ht
         )
         self.executor = ThreadPoolExecutor(max_workers=2)  # 双线程解码
 
-    def _async_decode(self, nalu_data):
-        return self._decode_frame(nalu_data)
-
     def _init_decoder(self):
         """替换原来的初始化逻辑"""
         self.decoder.init_decoder(
@@ -395,9 +392,10 @@ class FLVParser:  #ht
                 self.logger.debug(f"Invalid PrevTagSize {u}")
             o += 11 + r + 4
 
-        if self.ga() and self.nr and ((self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
-            self._handle_nalus()
+        # if self.ga() and self.nr and ((self.Ur is not None and len(self.Ur)) or (self.Pr is not None and len(self.Pr))):
+            # self._handle_nalus()
             # self.rr(self.Ur, self.Pr)
+
         return o
     def parse_flv_tags(self, data, byte_start):
         return self.ra(data,byte_start)
@@ -567,9 +565,7 @@ class FLVParser:  #ht
             self.Na(data, offset + 4, size - 4)
         elif l == 1:
             # AVCPacketType 为 1，表示 AVC 原始帧数据
-            # start = time.time()
             self.Qa(data, offset + 4, size - 4, timestamp, byte_start, frame_type, h)
-            # self.logger.debug(f"解密视频数据耗时 {(time.time()-start)*1000:.4f} 毫秒")
         elif l != 2:
             # AVCPacketType 不为 0 或 1，表示无效的视频数据类型
             self.Xs("Flv: Invalid video packet type {}".format(l))
@@ -823,7 +819,7 @@ class FLVParser:  #ht
                         self._r = 0
                 else:
                     f = "P"
-            a = bytes(data[offset + u:offset + u + c + s])  # 读取 NALU 数据
+            a = bytearray(data[offset + u:offset + u + c + s])  # 读取 NALU 数据
             b = a[c] & 255  # 获取 NALU 数据的第一个字节
 
             if (b == 65 or b == 97 or b == 101) and self.Wr:
@@ -865,10 +861,14 @@ class FLVParser:  #ht
                 'Xa': y  # 北京时间毫秒数
             }
 
+            self.decoder.async_decode(bytes(bytearray().join(
+                unit['data']
+                for unit in frames
+                if unit['type'] in {1, 5})))
             if m:
                 t4['qs'] = byte_start
 
-            e4['Vr'].append(t4)
+            # e4['Vr'].append(t4)
             e4['length'] += d
 
     def _handle_nalus(self):
@@ -884,7 +884,7 @@ class FLVParser:  #ht
         if all_nalu_data:
             self.decoder.async_decode(bytes(all_nalu_data))
         # 清空已处理数据
-        self.Pr['Vr'].clear()
+        # self.Pr['Vr'].clear()
 
     @staticmethod
     def captured_regions(frame, regions):

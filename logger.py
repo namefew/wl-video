@@ -29,13 +29,13 @@ class LogManager:
         if LogManager._logger is None:
             # 创建一个日志记录器
             logger = logging.getLogger('MAIN')
-            logger.setLevel(logging.DEBUG)
+            logger.setLevel(logging.INFO)
 
             # 避免重复添加处理器
             if not logger.hasHandlers():
                 # 创建一个控制台处理器
                 ch = logging.StreamHandler()
-                ch.setLevel(logging.DEBUG)
+                ch.setLevel(logging.INFO)
 
                 # 创建一个自定义格式化器
                 formatter = ColoredFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

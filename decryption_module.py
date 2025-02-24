@@ -1,5 +1,6 @@
 from wasmtime import Engine, Store, Module, Instance, Memory, MemoryType, Limits,  Val
 import ctypes
+import wasmtime
 # 创建存储和引擎
 store = Store(Engine())
 module = Module.from_file(store.engine, 'decrypt.wasm')  # 直接加载wasm文件
@@ -18,41 +19,30 @@ instance = Instance(store, module, imports)
 exports = instance.exports(store)
 mem = exports['a']
 decrypt = exports['c']
-current_offset = 0
-WASM_MEM_SIZE = 11*65535
 
+def decrypt_function(src_data):
+    # 读取src.txt并构造字节数组
+    ptr = ctypes.cast(mem.data_ptr(store), ctypes.POINTER(ctypes.c_ubyte))
+    # 内存写入（安全方式）
+    src_bytes = bytes(src_data)
+    ctypes.memmove(ptr, src_bytes, len(src_bytes))
 
-def decrypt_function(src_data: bytes) -> bytes:
-    global current_offset
-
-    data_len = len(src_data)
-    required_size = data_len + 4  # 保留头部4字节
-
-    # 内存循环使用逻辑
-    if current_offset + required_size > WASM_MEM_SIZE:
-        current_offset = 0
-
-    # 获取WASM内存视图
-    wasm_buf = (ctypes.c_ubyte * WASM_MEM_SIZE).from_address(
-        ctypes.addressof(mem.data_ptr(store).contents)
-    )
-
-    # 内存拷贝
-    ctypes.memmove(
-        ctypes.byref(wasm_buf, current_offset),  # 目标地址
-        src_data,  # 源数据
-        data_len
-    )
-
-    # 调用解密函数
-    decrypt(store,
-            Val.i32(current_offset),  # 起始偏移
+    # 调用解密函数（参数验证）
+    try:
+        # 使用 store.call 方法来调用 Func 对象，并传递所有参数
+        decrypt(store,
+            Val.i32(0),  # 起始偏移量
             Val.i32(4),  # 操作起始位置
-            Val.i32(data_len - 4)  # 操作长度
-            )
+            Val.i32(len(src_bytes) - 4)  # 操作长度
+        )
+    except TypeError as e:
+        print(f"函数调用参数错误: {str(e)}")
+        return
+    except wasmtime._error.WasmtimeError as e:
+        print(f"Wasmtime 错误: {str(e)}")
+        return
 
-    # 读取结果
-    result = bytes(wasm_buf[current_offset: current_offset + data_len])
+    # 读取结果（带缓冲区保护）
+    result = bytes(ptr[i] for i in range(len(src_data)))
 
-    current_offset += required_size
     return result

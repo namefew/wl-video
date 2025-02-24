@@ -3,7 +3,6 @@ import time
 from flv_parser import FLVParser
 from media_play import yt
 import requests
-from concurrent.futures import ThreadPoolExecutor
 
 class bt:
 
@@ -24,6 +23,17 @@ class bt:
         self.sn = bytearray()  # 缓存未处理的数据块
         self.bA = []  # 存储事件监听器清理函数
         self.logger=logger
+        # ht.load_decrypt_function()  # 加载解密函数
+        # logging.debug(f"{A.It}: Create FlvToFmp4Handler()")  # 日志记录
+
+        # # 监听播放器状态变化，确保 URL 更新
+        # def on_player_status(status):
+        #     if status == v.W:
+        #         self.url = b.config.url
+        #
+        # b.Ye.on("playerStatus", on_player_status)  # 添加事件监听器
+        # self.bA.append(lambda: b.Ye.off("playerStatus", on_player_status))  # 存储清理函数以便后续移除监听器
+
 
     def pn(self, e):
         if self.en:  # 如果是第一次接收到数据
@@ -42,21 +52,19 @@ class bt:
             self.gA.aA = self.vA  # 绑定视频数据回调
             self.gA.rA = self.SA  # 绑定音频数据回调
 
-            # 智能缓冲区管理
-        if len(self.sn) > 4 * 1024 * 1024:  # 4MB阈值
-            keep = len(self.sn) // 2
-            self.sn = self.sn[-keep:]
-            self.tn -= (len(self.sn) - keep)
+        # 合并新旧数据块
+        t = self.tn - len(self.sn)
+        i = bytearray(len(self.sn) + len(e))
+        i[:len(self.sn)] = self.sn  # 设置旧数据
+        i[len(self.sn):] = e  # 追加新数据
 
-            # 链式内存视图处理
-        chunks = [memoryview(self.sn), memoryview(e)]
-        # 修改后（正确方式）
-        merged_bytes = b''.join(chunks)  # 使用bytes类型进行合并
-        merged_view = memoryview(merged_bytes)  # 转换为memoryview
-        s = self.gn.ra(merged_bytes,self.tn-len(self.sn))
-        # 直接操作视图切片
-        self.sn = merged_view[s:]
-        self.tn += len(e)
+        # 解析合并后的数据
+        s = self.gn.ra(i, t)
+        self.sn = bytearray()  # 清空缓存
+        if s < len(i):
+            self.sn = i[s:]  # 保留未处理的数据
+        self.tn += len(e)  # 更新已接收的数据总长度
+
 
     # 设置视频回调函数
     @property
@@ -107,7 +115,7 @@ class bt:
 
             for chunk in response.iter_content(chunk_size=4096*4):
                 if chunk:
-                    start = time.time()
+                    # start = time.time()
                     self.pn(chunk)
                     # self.logger.debug(f"Processed chunk in {(time.time() - start)*1000} ms")
         except requests.exceptions.RequestException as e:

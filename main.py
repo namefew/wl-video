@@ -101,7 +101,7 @@ def get_white_ratio(image, threshold=200):
 
 if __name__ == "__main__":
     logger.info("启动流媒体处理器...")
-    tables = [{'table_id': 8801, 'name': '龙虎',
+    tables = [{'table_id': 8801, 'name': '龙虎L01',
                'links': [{'url': 'https://pl2079.gslxqy.com/live/v2flv_L01_2.flv',
                          'regions': [(486, 924, 94, 96),(724, 924, 94, 96)]},
                         {'url': 'https://pl2079.gslxqy.com/live/v2flv_L01_2_l.flv',
@@ -117,8 +117,8 @@ if __name__ == "__main__":
                          'regions': [(324, 615, 62, 62), (483, 615, 62, 62)]}
                         ]
                }]
-    table = tables[1]
-    link = table["links"][1]
+    table = tables[0]
+    link = table["links"][0]
     url = link["url"]
     regions = link["regions"]
 

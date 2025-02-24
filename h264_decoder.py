@@ -72,11 +72,19 @@ class H264Decoder:
             codec = av.Codec('h264', 'r')
             self._parser = av.CodecContext.create(codec)
             self._parser.options = {
-                'threads': 'auto',  # 自动检测CPU核心数
+                'threads': '4',  # 自动检测CPU核心数
                 'flags': '+low_delay',
                 'refs': '1',  # 减少参考帧数
+                'err_detect': 'ignore_err',
                 'enable': 'fast'  # 启用快速解码模式
             }
+            self._parser.options.update({
+                'skip_frame': 'default',  # 跳过非关键帧的解码
+                'skip_loop_filter': 'all',  # 关闭环路滤波
+                'error_resilient': '1',  # 增强容错能力
+                'max_pixel': '2.5',  # 限制像素计算复杂度
+                'lowres': '0'  # 保持原始分辨率但要确认是否可降级
+            })
             self._is_hw_accel = False
 
         # 构建extradata
@@ -94,7 +102,7 @@ class H264Decoder:
         """提交异步解码任务"""
         if not self._parser:
             raise RuntimeError("Decoder not initialized")
-        
+
         def _decode_task():
             start_time = time.time()
             try:
@@ -107,7 +115,7 @@ class H264Decoder:
                         if f is not None
                     )
                 # 计算解码性能
-                self.logger.debug(f"解码{len(frames)}耗时: {(time.time() - start_time)*1000:.2f} ms")
+                self.logger.debug(f"解码{len(frames)}帧耗时: {(time.time() - start_time)*1000:.2f} ms")
                 return frames
             except Exception as e:
                 self._handle_error(e)
