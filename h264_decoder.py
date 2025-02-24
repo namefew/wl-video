@@ -68,7 +68,7 @@ class H264Decoder:
             self.logger.info(f"成功启用NVIDIA硬件解码器，配置参数：{self._parser.options}")
 
         except Exception as e:
-            self.logger.warning(f"Fallback to software decoder: {str(e)}")
+            self.logger.warning(f"硬件解码初始化失败，回撤到软件解码")
             codec = av.Codec('h264', 'r')
             self._parser = av.CodecContext.create(codec)
             self._parser.options = {

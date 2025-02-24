@@ -1,3 +1,4 @@
+import os
 import socket
 from concurrent.futures import ThreadPoolExecutor
 
@@ -101,8 +102,12 @@ class RegionCaptureProcessor:
             sub_imgs = self._capture_regions(frame)
             all_sub_images.append(sub_imgs)
         self.frame_count += len(frames)
-        self._handle_images(all_sub_images)
-        self._trigger_callback(all_sub_images)
+        card1,card2 = self._handle_images(all_sub_images)
+        if not card1:
+            card1 = "?" if self.status[0]==1 else ""
+        if not card2:
+            card2 = "?" if self.status[1]==1 else ""
+        self._trigger_callback(all_sub_images,[card1,card2])
         return all_sub_images
 
     def check_card_background(self, status, white_ratio1, white_ratio2, image1, image2):
@@ -198,16 +203,18 @@ class RegionCaptureProcessor:
         """保存首帧验证数据"""
         timestamp = int(time.time())
         for i, img in enumerate(sub_imgs):
-            cv2.imwrite(f'first_frame_{timestamp}.jpg', img)
+            os.mkdir("images",True)
+            cv2.imwrite(f'images/first_frame_{timestamp}.jpg', img)
         self.logger.debug("首帧验证图像已保存")
 
-    def _trigger_callback(self, all_sub_images: List[List[np.ndarray]]):
+    def _trigger_callback(self, all_sub_images: List[List[np.ndarray]],labels:List):
         """触发图像就绪回调"""
         if self.on_image_ready:
             self.on_image_ready({
                 'timestamp': time.time(),
                 'frame_count': self.frame_count,
-                'images': all_sub_images
+                'images': all_sub_images,
+                'labels':labels
             })
 
     @property
@@ -230,7 +237,7 @@ class RegionCaptureProcessor:
                 card_front1, card_front2 = self.check_card_background(self.status, white_ratio1, white_ratio2, image1,
                                                                       image2)
                 if not card_front1 and not card_front2:
-                    return
+                    return "",""
                 # 检查是否满足所有条件
                 if (self.has_seen_card_back[0] and self.has_seen_card_back[1]
                         and self.first_card_back_time[1] is not None
@@ -250,7 +257,7 @@ class RegionCaptureProcessor:
                     poker2 = Poker(predicted_class2)
 
                     if confidence1 >= self.confidence_threshold and confidence2 >= self.confidence_threshold:
-                        recongnize_cnt = 0
+                        self.recongnize_cnt = 0
                         self.last_white_ratio = [white_ratio1, white_ratio2]
                         self.logger.info(f"龙{poker1.card} [{confidence1:.4f}]  - 虎{poker2.card} [{confidence2:.4f}] ")
                         self.logger.info(f"识别图耗时: {(detection_time - start_time) * 1000:.2f} 毫秒")
@@ -264,7 +271,7 @@ class RegionCaptureProcessor:
                         # 重置状态变量
                         self.has_seen_card_back = [False, False]
                         self.first_card_back_time = [None, None]
-                        return
+                        return poker1.card, poker2.card
                     else:
                         self.recongnize_cnt += 1
                         self.last_white_ratio = [white_ratio1, white_ratio2]
@@ -275,7 +282,7 @@ class RegionCaptureProcessor:
                 else:
                     self.first_card_back_time = [None, None]
                     self.has_seen_card_back = [False, False]
-                    return
+                    return "",""
 
     def take_action(self, poker1: Poker, poker2: Poker):
         if poker1.card_num == poker2.card_num:
