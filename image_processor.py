@@ -203,7 +203,7 @@ class RegionCaptureProcessor:
         """保存首帧验证数据"""
         timestamp = int(time.time())
         for i, img in enumerate(sub_imgs):
-            os.mkdir("images",True)
+            os.makedirs('images', exist_ok=True)
             cv2.imwrite(f'images/first_frame_{timestamp}.jpg', img)
         self.logger.debug("首帧验证图像已保存")
 
@@ -283,6 +283,7 @@ class RegionCaptureProcessor:
                     self.first_card_back_time = [None, None]
                     self.has_seen_card_back = [False, False]
                     return "",""
+        return "", ""
 
     def take_action(self, poker1: Poker, poker2: Poker):
         if poker1.card_num == poker2.card_num:

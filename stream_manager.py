@@ -22,6 +22,7 @@ class bt:
         self.zS = None  # 音频回调函数（可选）
         self.sn = bytearray()  # 缓存未处理的数据块
         self.bA = []  # 存储事件监听器清理函数
+        self.running = True
         self.logger=logger
         # ht.load_decrypt_function()  # 加载解密函数
         # logging.debug(f"{A.It}: Create FlvToFmp4Handler()")  # 日志记录
@@ -109,14 +110,32 @@ class bt:
 
     def direct_stream_reader(self, url):
         try:
+            self.running = True
             self.logger.info(f"Starting to read stream from {url}")
             response = requests.get(url, stream=True)
             response.raise_for_status()
 
-            for chunk in response.iter_content(chunk_size=4096*4):
+            for chunk in response.iter_content(chunk_size=4096 * 4):
+                if not self.running:
+                    break
                 if chunk:
                     # start = time.time()
                     self.pn(chunk)
                     # self.logger.debug(f"Processed chunk in {(time.time() - start)*1000} ms")
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error reading stream from {url}: {e}")
+            self.clear_data()  # 清空数据
+            self.reconnect(url)  # 重新连接
+    def stop(self):
+        self.running = False
+        self.clear_data()
+        self.logger.info("处理视频流已被终止！！")
+    def clear_data(self):
+        self.sn = bytearray()  # 清空缓存未处理的数据块
+        self.tn = 0  # 重置已接收的数据总长度
+        self.en = True  # 标记为第一次接收到数据
+        self.isPre = False  # 标记为非预加载
+
+    def reconnect(self, url):
+        self.url = url  # 更新 URL
+        self.direct_stream_reader(url)  # 重新启动流读取
