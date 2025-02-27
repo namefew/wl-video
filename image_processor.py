@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 import socket
 from concurrent.futures import ThreadPoolExecutor
@@ -37,15 +38,17 @@ class RegionCaptureProcessor:
         self.first_card_back_time = [None, None]
         self.recongnize_cnt = 0
         self.last_white_ratio = [0,0]
-        self.status = [0, 0]  # 0: 未看到卡牌背景, 1: 看到卡牌背景, 2: 看到卡牌正面
+        self.status = [0, 0]  # 0: 未看到卡牌背面, 1: 看到卡牌背面, 2: 看到卡牌正面
         self.confidence_threshold = confidence_threshold
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.to_be_save_images = []
 
     def _get_white_ratio(self, image, threshold=200):
         """检查图片中是否包含超过指定比例的白色像素"""
-        gray = np.mean(image, axis=2)  # 更快地转换为灰度图
+        # gray = np.mean(image, axis=2)  # 更快地转换为灰度图
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         white_pixels = np.count_nonzero(gray > threshold)
         total_pixels = gray.size
         return white_pixels / total_pixels
@@ -111,39 +114,41 @@ class RegionCaptureProcessor:
         return all_sub_images
 
     def check_card_background(self, status, white_ratio1, white_ratio2, image1, image2):
-        if 0.008<white_ratio1<=0.025 and 0.008<white_ratio2<=0.025:
+        if 0.01<white_ratio1<=0.063 and 0.01<white_ratio2<=0.063:
             if status[0]!=1 and status[1]!=1:
                 b1, c1, b2, c2 = self.detect_images_background(image1, image2)
-                if c1>0.95 and b1==1 and c2>0.95 and b2==1:
+                if c1>0.97 and b1==1 and c2>0.97 and b2==1:
                     self.first_card_back_time[0] = time.time()
                     self.has_seen_card_back[0] = True
-                    self.logger.info(f"虎 卡牌背景 {white_ratio2:.4f}")
+                    self.logger.info(f"牌1 卡牌背面 {white_ratio1:.4f}  置信度:{c1:.4f}")
+
                     self.first_card_back_time[1] = time.time()
                     self.has_seen_card_back[1] = True
-                    self.logger.info(f"龙 卡牌背景 {white_ratio1:.4f}")
+                    self.logger.info(f"牌2 卡牌背面 {white_ratio2:.4f}  置信度:{c2:.4f}")
+
                     status[0]=1
                     status[1]=1
                     # self.update_image_callback(image1, image2, None, None)
         else:
-            if white_ratio1 <= 0.008:
+            if white_ratio1 <= 0.01:
                 if status[0] != 0:
                     status[0] = 0
-                    self.logger.info(f"龙 无牌 {white_ratio1:.4f}")
+                    self.logger.info(f"牌1 无牌 {white_ratio1:.4f}")
             elif 0.60 <= white_ratio1:
                 if status[0] != 2:
                     status[0] = 2
-                    self.logger.info(f"龙 其他背景 {white_ratio2:.4f}")
+                    self.logger.info(f"牌1 其他背面 {white_ratio2:.4f}")
 
-            if 0.025 < white_ratio1 < 0.60:
+            if 0.063 < white_ratio1 < 0.60:
                 if status[0] != 3:
                     status[0] = 3
                     # 卡牌正面
-                    self.logger.info(f"龙 卡牌正面 {white_ratio1:.4f}")
+                    self.logger.info(f"牌1 卡牌正面 {white_ratio1:.4f}")
 
-            if white_ratio2 <= 0.008:
+            if white_ratio2 <= 0.01:
                 if status[1] != 0:
                     status[1] = 0
-                    self.logger.info(f"虎 无牌 {white_ratio2:.4f}")
+                    self.logger.info(f"牌2 无牌 {white_ratio2:.4f}")
             # elif 0.008 < white_ratio2 <= 0.025:
             #     if status[1] != 1:
             #         status[1] = 1
@@ -151,18 +156,18 @@ class RegionCaptureProcessor:
             elif 0.60 <= white_ratio2:
                 if status[1] != 2:
                     status[1] = 2
-                    self.logger.info(f"虎 其他背景 {white_ratio2:.4f}")
+                    self.logger.info(f"牌2 其他背面 {white_ratio2:.4f}")
 
-            if 0.025 < white_ratio2 < 0.60:
+            if 0.063 < white_ratio2 < 0.60:
                 if status[1] != 3:
                     status[1] = 3
                     # 卡牌正面
-                    self.logger.info(f"虎 卡牌正面 {white_ratio2:.4f}")
+                    self.logger.info(f"牌2 卡牌正面 {white_ratio2:.4f}")
 
         # if old_status0!=1 and status[0]==1 and old_status1!=1 and status[1]==1:
 
-        card_front1 = 0.025 <= white_ratio1 < 0.60
-        card_front2 = 0.025 <= white_ratio2 < 0.60
+        card_front1 = 0.063 <= white_ratio1 < 0.60
+        card_front2 = 0.063 <= white_ratio2 < 0.60
 
         return card_front1,card_front2
 
@@ -236,7 +241,7 @@ class RegionCaptureProcessor:
 
                 card_front1, card_front2 = self.check_card_background(self.status, white_ratio1, white_ratio2, image1,
                                                                       image2)
-                if not card_front1 and not card_front2:
+                if not card_front1 or not card_front2:
                     return "",""
                 # 检查是否满足所有条件
                 if (self.has_seen_card_back[0] and self.has_seen_card_back[1]
@@ -259,25 +264,25 @@ class RegionCaptureProcessor:
                     if confidence1 >= self.confidence_threshold and confidence2 >= self.confidence_threshold:
                         self.recongnize_cnt = 0
                         self.last_white_ratio = [white_ratio1, white_ratio2]
-                        self.logger.info(f"龙{poker1.card} [{confidence1:.4f}]  - 虎{poker2.card} [{confidence2:.4f}] ")
-                        self.logger.info(f"识别图耗时: {(detection_time - start_time) * 1000:.2f} 毫秒")
-                        self.logger.info(f"总处理耗时: {(time.time() - start_time) * 1000:.2f} 毫秒")
-                        if time.time() - self.first_card_back_time[0] < 15.0 and time.time() - \
-                                self.first_card_back_time[1] < 15:
+                        self.logger.info(f"牌1: {poker1.card} [{confidence1:.4f}]  - 牌2: {poker2.card} [{confidence2:.4f}] ")
+                        # self.logger.info(f"识别图耗时: {(detection_time - start_time) * 1000:.2f} 毫秒")
+                        # self.logger.info(f"总处理耗时: {(time.time() - start_time) * 1000:.2f} 毫秒")
+                        if time.time() - self.first_card_back_time[0] < 20.0 and time.time() - \
+                                self.first_card_back_time[1] < 20:
                             self.take_action(poker1, poker2)
                         else:
-                            self.logger.warning("时间太长，不进行下注")
+                            self.logger.warning("时间太长，不广播消息")
                         # self.update_image_callback(image1, image2, poker1, poker2)
                         # 重置状态变量
                         self.has_seen_card_back = [False, False]
                         self.first_card_back_time = [None, None]
+                        self.save_images(poker1,poker2)
                         return poker1.card, poker2.card
                     else:
                         self.recongnize_cnt += 1
                         self.last_white_ratio = [white_ratio1, white_ratio2]
-                        self.logger.info(f"识别失败，置信度不够 龙{poker1.card} [{confidence1:.4f}]  - 虎{poker2.card} [{confidence2:.4f}] ")
-                        self.logger.info(f"识别图耗时: {(detection_time - start_time) * 1000:.2f} 毫秒")
-                        self.logger.info(f"总处理耗时: {(time.time() - start_time) * 1000:.2f} 毫秒")
+                        self.logger.info(f"识别失败，置信度不够 牌1: {poker1.card} [{confidence1:.4f}]{white_ratio1:.4F}  - 牌2: {poker2.card} [{confidence2:.4f}]{white_ratio2:.4F}  ")
+                        self.to_be_save_images.append(sub_images)
                         # self.update_image_callback(image1, image2, poker1, poker2)
                 else:
                     self.first_card_back_time = [None, None]
@@ -286,23 +291,25 @@ class RegionCaptureProcessor:
         return "", ""
 
     def take_action(self, poker1: Poker, poker2: Poker):
-        if poker1.card_num == poker2.card_num:
-            name = '和'
-        elif poker1.card_num > poker2.card_num:
-            name = '龙'
-        else:
-            name = '虎'
-        self.logger.info(f"龙：{poker1.card}，虎：{poker2.card} 下注{name}")
         self.send_broadcast_message(poker1.classic, poker2.classic)
 
     def send_broadcast_message(self, card1_index, card2_index, port=5005):
         # 发送广播消息
         start = time.time()
         message = f"{card1_index},{card2_index},{start}"
-        # if self.websocket_server:
-        #     # 使用 call_soon_threadsafe 来安全地调用 asyncio 的协程
-        #     self.websocket_server.loop.call_soon_threadsafe(
-        #         asyncio.create_task, self.websocket_server.broadcast_message(message)
-        #     )
+
         self.sock.sendto(message.encode(), ('<broadcast>', port))
         self.logger.info(f"广播消息: {message}")
+
+    def save_images(self,poker1,poker2):
+        if self.to_be_save_images:
+            now = datetime.now()
+            formatted_time = now.strftime("%Y%m%d%H%M%S.%f")[:-3]
+            index = 0
+            for sub_images in self.to_be_save_images:
+                index += 1
+                image1, image2 = sub_images[0], sub_images[1]
+                cv2.imwrite(f'images/{poker1.classic}_{formatted_time}_{index}.jpg', image1)
+                cv2.imwrite(f'images/{poker2.classic}_{formatted_time}_{index}.jpg', image2)
+            self.to_be_save_images.clear()
+

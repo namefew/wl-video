@@ -1,0 +1,191 @@
+{
+	"tables": [{
+		"table_id": 8201,
+		"name": "极速 B01",
+		"links": [{
+			"type": "超清 1080P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B01_2.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "超清 1080P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B01_1.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "高清 720P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B01_1_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		},
+		{
+			"type": "高清 720P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B01_2_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		}]
+	},
+	{
+		"table_id": 8202,
+		"name": "极速 B02",
+		"links": [{
+			"type": "超清 1080P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B02_2.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "超清 1080P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B02_1.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "高清 720P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B02_1_l.flv",
+			"regions": [[280, 506, 56, 58], [340, 506, 56, 58]]
+		},
+		{
+			"type": "高清 720P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B02_2_l.flv",
+			"regions": [[280, 506, 56, 58], [340, 506, 56, 58]]
+		}]
+	},
+	{
+		"table_id": 8203,
+		"name": "极速 B03",
+		"links": [{
+			"type": "超清 1080P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B03_2.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "超清 1080P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B03_1.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "高清 720P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B03_1_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		},
+		{
+			"type": "高清 720P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B03_2_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		}]
+	},
+	{
+		"table_id": 8204,
+		"name": "极速 B04",
+		"links": [{
+			"type": "超清 1080P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B04_2.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "超清 1080P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B04_1.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "高清 720P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B04_1_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		},
+		{
+			"type": "高清 720P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B04_2_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		}]
+	},
+	{
+		"table_id": 8205,
+		"name": "极速 B05",
+		"links": [{
+			"type": "超清 1080P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B05_2.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "超清 1080P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B05_1.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "高清 720P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B05_1_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		},
+		{
+			"type": "高清 720P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B05_2_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		}]
+	},
+	{
+		"table_id": 8206,
+		"name": "极速 B06",
+		"links": [{
+			"type": "超清 1080P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B06_2.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "超清 1080P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B06_1.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "高清 720P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B06_1_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		},
+		{
+			"type": "高清 720P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B06_2_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		}]
+	},
+	{
+		"table_id": 8207,
+		"name": "极速 B07",
+		"links": [{
+			"type": "超清 1080P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B07_2.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "超清 1080P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B07_1.flv",
+			"regions": [[430, 762, 78, 80], [512, 762, 78, 80]]
+		},
+		{
+			"type": "高清 720P 聚焦",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B07_1_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		},
+		{
+			"type": "高清 720P",
+			"url": "https://pl1653.cslyxs.cn/live/v3flv_B07_2_l.flv",
+			"regions": [[278, 506, 56, 58], [338, 506, 56, 58]]
+		}]
+	}
+
+
+
+
+
+
+    ,{
+		"table_id": 8801,
+		"name": "龙虎 L01",
+		"links": [{
+			"type": "超清 1080P",
+			"url": "https://pl2079.gslxqy.com/live/v2flv_L01_2.flv",
+			"regions": [[486, 924, 94, 96], [724, 924, 94, 96]]
+		},
+		{
+			"type": "高清 720P",
+			"url": "https://pl2079.gslxqy.com/live/v2flv_L01_2_l.flv",
+			"regions": [[324, 615, 62, 62], [483, 615, 62, 62]]
+		}]
+	}
+    ]
+}

@@ -1,5 +1,6 @@
 # video_ui.py
 import os
+import queue
 import threading
 import tkinter as tk
 from queue import Queue
@@ -18,12 +19,13 @@ logger = LogManager.setup()
 class VideoUI:
     def __init__(self, tables=None):
         self.root = tk.Tk()
-        self.root.title("WL-LongHu")
+        self.root.title("WL-Video")
         self.root.geometry("400x300+100+100")  # 固定窗口大小
         self.root.configure(bg='#2c3e50')  # 添加背景色
 
         # 初始化桌台数据
-        self.tables = tables
+        self.tables = [table['name'] for table in tables] if tables else []
+        self.tables_config = tables
 
         # 创建工具栏
         self.create_toolbar()
@@ -48,22 +50,46 @@ class VideoUI:
         self.stream_manager = None
         self.running = False
 
+        # 图像更新线程
+        self.image_update_thread = None
+        self.image_update_queue = Queue()
+
     def create_toolbar(self):
         """创建工具栏"""
         toolbar = ttk.Frame(self.root)
         toolbar.pack(side=tk.TOP, fill=tk.X)
 
         # 标签：请选择桌台
-        label = ttk.Label(toolbar, text="请选择桌台:", font=('Arial', 10), background='#34495e', foreground='white')
-        label.pack(side=tk.LEFT, padx=5, pady=5)
+        label_table = ttk.Label(toolbar, text="桌台:", font=('Arial', 10), background='#34495e', foreground='white')
+        label_table.pack(side=tk.LEFT, padx=5, pady=5)
 
         # 下拉选择框：tables
-        self.table_combobox = ttk.Combobox(toolbar, values=self.tables, width=20)
+        self.table_combobox = ttk.Combobox(toolbar, values=self.tables, width=10)
         self.table_combobox.pack(side=tk.LEFT, padx=5, pady=5)
+        self.table_combobox.bind("<<ComboboxSelected>>", self.update_links)
+
+        # 标签：请选择视频流
+        label_link = ttk.Label(toolbar, text="视频:", font=('Arial', 10), background='#34495e', foreground='white')
+        label_link.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # 下拉选择框：links
+        self.link_combobox = ttk.Combobox(toolbar, values=[], width=10)
+        self.link_combobox.pack(side=tk.LEFT, padx=5, pady=5)
 
         # 按钮：开始/停止
         self.start_stop_button = ttk.Button(toolbar, text="开始", command=self.toggle_processing)
         self.start_stop_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+    def update_links(self, event):
+        """更新视频流选择框"""
+        table_name = self.table_combobox.get()
+        selected_table = next((table for table in self.tables_config if table['name'] == table_name), None)
+        if selected_table:
+            links = selected_table["links"]
+            self.link_combobox['values'] = [link["type"] if "type" in link else link["url"] for link in links]
+            self.link_combobox.current(0)  # 设置默认选择
+        else:
+            self.link_combobox['values'] = []
 
     def toggle_processing(self):
         """切换开始/停止处理"""
@@ -75,21 +101,25 @@ class VideoUI:
     def start_processing(self):
         """开始处理流媒体"""
         table_name = self.table_combobox.get()
-        if table_name:
-            logger.info(f"开始处理桌台: {table_name}")
+        link_type = self.link_combobox.get()
+        if table_name and link_type:
+            logger.info(f"开始处理桌台: {table_name}, 视频流: {link_type}")
+            self.root.title = f"WL-Video: {table_name} - {link_type}"
             self.running = True
             self.start_stop_button.config(text="停止")
-            self.start_run(table_name)
+            self.start_run(table_name, link_type)
         else:
-            logger.warning("请选择桌台")
+            logger.warning("请选择桌台和视频流")
 
     def stop_processing(self):
         """停止处理流媒体"""
         logger.info("停止处理流媒体")
         self.running = False
         self.start_stop_button.config(text="开始")
-        self.stream_manager.stop()
-
+        if self.stream_manager:
+            self.stream_manager.stop()
+        if self.image_update_thread and self.image_update_thread.is_alive():
+            self.image_update_thread.join(timeout=1)  # 等待线程结束
 
     def create_image_panels(self):
         """重构图像显示区域"""
@@ -142,7 +172,9 @@ class VideoUI:
 
             # 更新显示
             self.panel1.config(image=self.current_frames[0])
+            self.panel1.image = self.current_frames[0]  # 保持对 PhotoImage 的引用
             self.panel2.config(image=self.current_frames[1])
+            self.panel2.image = self.current_frames[1]  # 保持对 PhotoImage 的引用
 
         self.task_queue.put(_task)
 
@@ -153,7 +185,7 @@ class VideoUI:
                 task = self.task_queue.get_nowait()
                 task()
         finally:
-            self.root.after(35, self.process_queue)  # 调整为20fps
+            self.root.after(35, self.process_queue)  # 调整为35毫秒
 
     def run(self):
         """启动主循环"""
@@ -198,35 +230,36 @@ class VideoUI:
             safe_images = [np.copy(img) for img in sub_imgs]
             self.update_images(safe_images)
 
-    def start_run(self, table_name):
-        stream_thread = threading.Thread(target=self._start_run, args=(table_name,), daemon=True)
+    def start_run(self, table_name, link_type):
+        self.image_update_thread = threading.Thread(target=self._image_update_loop, daemon=True)
+        self.image_update_thread.start()
+
+        stream_thread = threading.Thread(target=self._start_run, args=(table_name, link_type), daemon=True)
         stream_thread.start()
 
-    def _start_run(self, table_name):
-        logger.info("启动流媒体处理器...")
-        tables = [{'table_id': 8801, 'name': '龙虎L01',
-                   'links': [{'url': 'https://pl2079.gslxqy.com/live/v2flv_L01_2.flv',
-                             'regions': [(486, 924, 94, 96),(724, 924, 94, 96)]},
-                            {'url': 'https://pl2079.gslxqy.com/live/v2flv_L01_2_l.flv',
-                             'regions': [(324, 615, 62, 62), (483, 615, 62, 62)]}
-                            ]
-                   },
-                  {'table_id': 8802, 'name': '极速B07',
-                   'links': [{ 'url': 'https://pl1653.cslyxs.cn/live/v3flv_B07_2.flv',
-                            'regions': [(508-78, 838-82, 78, 80),(508+4, 838-82, 78, 80)]},
-                            {'url': 'https://pl1653.cslyxs.cn/live/v3flv_B07_1.flv',
-                             'regions': [(508-78, 838-82, 78, 80),(508+4, 838-82, 78, 80)]},
-                            {'url': 'https://pl1653.cslyxs.cn/live/v3flv_B07_1_l.flv',
-                             'regions': [(324, 615, 62, 62), (483, 615, 62, 62)]}
-                            ]
-                   }]
-        selected_table = next((table for table in tables if table['name'] == table_name), None)
-        if selected_table:
-            link = selected_table["links"][0]
-            url = link["url"]
-            regions = link["regions"]
+    def _image_update_loop(self):
+        """图像更新循环"""
+        while self.running:
+            try:
+                frame_images = self.image_update_queue.get(timeout=0.1)
+                self.task_queue.put(lambda: self.update_images(frame_images))
+            except queue.Empty:
+                continue
+            except Exception as e:
+                logger.error(f"图像更新错误: {str(e)}")
 
-            self.stream_manager = bt(data_callback=None, logger=logger, regions=regions, image_callback=self.on_image_ready)
-            self.stream_manager.direct_stream_reader(url)
+    def _start_run(self, table_name, link_type):
+        logger.info("启动流媒体处理器...")
+        selected_table = next((table for table in self.tables_config if table['name'] == table_name), None)
+        if selected_table:
+            selected_link = next((link for link in selected_table["links"] if link.get("type") == link_type or link["url"] == link_type), None)
+            if selected_link:
+                url = selected_link["url"]
+                regions = selected_link["regions"]
+
+                self.stream_manager = bt(data_callback=None, logger=logger, regions=regions, image_callback=self.on_image_ready)
+                self.stream_manager.direct_stream_reader(url)
+            else:
+                logger.warning(f"未找到视频流: {link_type}")
         else:
             logger.warning(f"未找到桌台: {table_name}")
