@@ -16,7 +16,7 @@ from image_processor import RegionCaptureProcessor
 
 class FLVParser:  #ht
     """优化的FLV解析器"""
-    def __init__(self, e=None, t='All', i=None, logger=None,regions=None,on_image_ready=None):
+    def __init__(self, e=None, t='All', i=None, logger=None,regions=None,on_image_ready=None,table_data=None):
         if i is None:
             i = [6]
         if e is None:
@@ -129,7 +129,8 @@ class FLVParser:  #ht
         self.image_processor = RegionCaptureProcessor(
             regions=regions or [(486, 924, 94, 96), (724, 924, 94, 96)],
             on_image_ready=on_image_ready,
-            logger=logger
+            logger=logger,
+            table_data=table_data
         )
         self.executor = ThreadPoolExecutor(max_workers=2)  # 双线程解码
 
@@ -141,32 +142,6 @@ class FLVParser:  #ht
             width=self.mr['Oa'],
             height=self.mr['Ha']
         )
-        #
-        # """初始化FFmpeg软解码器"""
-        # try:
-        #     codec = av.Codec('h264', 'r')
-        #     # codec = av.Codec('h264_cuvid', 'r')
-        #     # self.logger.info("成功加载NVIDIA CUVID硬件解码器")
-        # except av.FFmpegError:
-        #     codec = av.Codec('h264', 'r')
-        #     # self.logger.warning("未找到硬件解码器，回退到软件解码")
-        #
-        # parser = av.CodecContext.create(codec)
-        # sps = self.mr['Ca']
-        # pps = self.mr['Ja']
-        # extradata = bytes([0x01]) + sps[1:4]  # profile/level等
-        # extradata += bytes([0xff])  # 6 bits reserved + 2 bits lengthSizeMinusOne
-        # extradata += bytes([0xe1])  # sps count
-        # extradata += len(sps).to_bytes(2, 'big') + sps
-        # extradata += bytes([0x01])  # pps count
-        # extradata += len(pps).to_bytes(2, 'big') + pps
-        # parser.extradata = extradata
-        # parser.height = self.mr['Ha']
-        # parser.width = self.mr['Oa']
-        # self.codec_ctx = {
-        #     'parser':parser ,
-        #     'frame_queue': []
-        # }
 
     def _on_frames_decoded(self, frames: list[np.ndarray]):
         """解码完成事件处理"""

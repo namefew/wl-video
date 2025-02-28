@@ -257,7 +257,7 @@ class VideoUI:
                 url = selected_link["url"]
                 regions = selected_link["regions"]
 
-                self.stream_manager = bt(data_callback=None, logger=logger, regions=regions, image_callback=self.on_image_ready)
+                self.stream_manager = bt(data_callback=None, logger=logger, regions=regions, image_callback=self.on_image_ready,table_data=selected_table)
                 self.stream_manager.direct_stream_reader(url)
             else:
                 logger.warning(f"未找到视频流: {link_type}")

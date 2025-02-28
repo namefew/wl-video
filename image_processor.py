@@ -19,7 +19,8 @@ class RegionCaptureProcessor:
     def __init__(self,
                  regions: List[Tuple[int, int, int, int]],
                  on_image_ready: Optional[Callable[[dict], None]] = None,
-                 logger: Optional[logging.Logger] = None,confidence_threshold=0.995):
+                 logger: Optional[logging.Logger] = None,confidence_threshold=0.995,
+                 table_data = None):
         """
         :param regions: 截取区域列表，格式 [(x, y, width, height), ...]
         :param on_image_ready: 图像处理完成回调函数
@@ -44,6 +45,7 @@ class RegionCaptureProcessor:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.to_be_save_images = []
+        self.table_data = table_data
 
     def _get_white_ratio(self, image, threshold=200):
         """检查图片中是否包含超过指定比例的白色像素"""
@@ -206,11 +208,10 @@ class RegionCaptureProcessor:
 
     def _save_first_frame_validation(self, sub_imgs: List[np.ndarray]):
         """保存首帧验证数据"""
-        timestamp = int(time.time())
+        subfolder_path, formatted_time = self.get_sub_folder()
         for i, img in enumerate(sub_imgs):
-            os.makedirs('images', exist_ok=True)
-            cv2.imwrite(f'images/first_frame_{timestamp}.jpg', img)
-        self.logger.debug("首帧验证图像已保存")
+            cv2.imwrite(f'{subfolder_path}\\first_frame_{formatted_time}_{i}.jpg', img)
+        self.logger.info("首帧验证图像已保存") #'images\\经典-B20-8220\\20250228\\00\\first_frame_20250228000708.952_0.jpg'
 
     def _trigger_callback(self, all_sub_images: List[List[np.ndarray]],labels:List):
         """触发图像就绪回调"""
@@ -296,20 +297,35 @@ class RegionCaptureProcessor:
     def send_broadcast_message(self, card1_index, card2_index, port=5005):
         # 发送广播消息
         start = time.time()
-        message = f"{card1_index},{card2_index},{start}"
+        message = f"{self.table_data['table_id']},{card1_index},{card2_index},{self.table_data['name']},{start}"
 
         self.sock.sendto(message.encode(), ('<broadcast>', port))
         self.logger.info(f"广播消息: {message}")
 
+    def get_sub_folder(self):
+        now = datetime.now()
+        image_folder = "images"
+        # 格式化日期和时间
+        date_str = now.strftime("%Y%m%d")
+        hour_str = now.strftime("%H")
+        formatted_time = now.strftime("%Y%m%d%H%M%S.%f")[:-3]
+        # 创建子文件夹路径
+        if self.table_data and self.table_data['name'] and self.table_data['table_id']:
+            subfolder_path = os.path.join(image_folder, f'{self.table_data["name"].replace(" ", "-")}-{self.table_data["table_id"]}',
+                                          date_str, hour_str)
+        else:
+            subfolder_path = os.path.join(image_folder, date_str, hour_str)
+        os.makedirs(subfolder_path, exist_ok=True)
+        return subfolder_path,formatted_time
     def save_images(self,poker1,poker2):
         if self.to_be_save_images:
-            now = datetime.now()
-            formatted_time = now.strftime("%Y%m%d%H%M%S.%f")[:-3]
+
             index = 0
+            subfolder_path, formatted_time = self.get_sub_folder()
             for sub_images in self.to_be_save_images:
                 index += 1
                 image1, image2 = sub_images[0], sub_images[1]
-                cv2.imwrite(f'images/{poker1.classic}_{formatted_time}_{index}.jpg', image1)
-                cv2.imwrite(f'images/{poker2.classic}_{formatted_time}_{index}.jpg', image2)
+                cv2.imwrite(f'{subfolder_path}\\{poker1.classic}_{formatted_time}_{index}.jpg', image1)
+                cv2.imwrite(f'{subfolder_path}\\{poker2.classic}_{formatted_time}_{index}.jpg', image2)
             self.to_be_save_images.clear()
 
