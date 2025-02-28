@@ -110,8 +110,9 @@ class bt:
             self.yA("mediaInfo", {**e, 'isPre': self.isPre, 'url': self.url})
 
     def direct_stream_reader(self, url):
+        if not self.running:
+            return
         try:
-            self.running = True
             self.logger.info(f"Starting to read stream from {url}")
             response = requests.get(url, stream=True)
             response.raise_for_status()

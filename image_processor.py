@@ -1,8 +1,9 @@
+import shutil
 from datetime import datetime
 import os
 import socket
 from concurrent.futures import ThreadPoolExecutor
-
+from PIL import Image
 import cv2
 import numpy as np
 import logging
@@ -19,7 +20,7 @@ class RegionCaptureProcessor:
     def __init__(self,
                  regions: List[Tuple[int, int, int, int]],
                  on_image_ready: Optional[Callable[[dict], None]] = None,
-                 logger: Optional[logging.Logger] = None,confidence_threshold=0.995,
+                 logger: Optional[logging.Logger] = None,confidence_threshold=0.99,
                  table_data = None):
         """
         :param regions: 截取区域列表，格式 [(x, y, width, height), ...]
@@ -47,6 +48,15 @@ class RegionCaptureProcessor:
         self.to_be_save_images = []
         self.table_data = table_data
 
+    def _get_red_ratio(self, image, lower_red1=(0, 100, 100), upper_red1=(10, 255, 255),
+                       lower_red2=(160, 100, 100), upper_red2=(180, 255, 255)):
+        """统计红色像素占比（HSV颜色空间）"""
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        # 定义红色在HSV中的两个范围（色相环首尾）
+        mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+        mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+        red_mask = cv2.bitwise_or(mask1, mask2)
+        return np.count_nonzero(red_mask) / red_mask.size
     def _get_white_ratio(self, image, threshold=200):
         """检查图片中是否包含超过指定比例的白色像素"""
         # gray = np.mean(image, axis=2)  # 更快地转换为灰度图
@@ -116,10 +126,12 @@ class RegionCaptureProcessor:
         return all_sub_images
 
     def check_card_background(self, status, white_ratio1, white_ratio2, image1, image2):
-        if 0.01<white_ratio1<=0.063 and 0.01<white_ratio2<=0.063:
+        red_ration1 = self._get_red_ratio(image1)
+        red_ration2 = self._get_red_ratio(image2)
+        if red_ration1>0.20 and red_ration2>0.20 and white_ratio1<=0.063 and white_ratio2<=0.063:
             if status[0]!=1 and status[1]!=1:
                 b1, c1, b2, c2 = self.detect_images_background(image1, image2)
-                if c1>0.97 and b1==1 and c2>0.97 and b2==1:
+                if c1>0.95 and b1==1 and c2>0.95 and b2==1:
                     self.first_card_back_time[0] = time.time()
                     self.has_seen_card_back[0] = True
                     self.logger.info(f"牌1 卡牌背面 {white_ratio1:.4f}  置信度:{c1:.4f}")
@@ -168,8 +180,8 @@ class RegionCaptureProcessor:
 
         # if old_status0!=1 and status[0]==1 and old_status1!=1 and status[1]==1:
 
-        card_front1 = 0.063 <= white_ratio1 < 0.60
-        card_front2 = 0.063 <= white_ratio2 < 0.60
+        card_front1 = 0.063 <= white_ratio1 < 0.60 and white_ratio1>red_ration1
+        card_front2 = 0.063 <= white_ratio2 < 0.60 and white_ratio2>red_ration2
 
         return card_front1,card_front2
 
@@ -209,10 +221,21 @@ class RegionCaptureProcessor:
     def _save_first_frame_validation(self, sub_imgs: List[np.ndarray]):
         """保存首帧验证数据"""
         subfolder_path, formatted_time = self.get_sub_folder()
+        self.logger.info(f"图片保存路径: {subfolder_path}")
+        if not os.access(subfolder_path, os.W_OK):
+            self.logger.error(f"没有写权限: {subfolder_path}")
+            return
+        total, used, free = shutil.disk_usage(subfolder_path)
+        self.logger.info(
+            f"磁盘空间: 总共 {total // (2 ** 30)} GB, 已用 {used // (2 ** 30)} GB, 剩余 {free // (2 ** 30)} GB")
+        if free < 100 * 2 ** 20:  # 检查剩余空间是否小于 100 MB
+            self.logger.error(f"磁盘空间不足: {subfolder_path}")
+            return
         for i, img in enumerate(sub_imgs):
-            cv2.imwrite(f'{subfolder_path}\\first_frame_{formatted_time}_{i}.jpg', img)
-        self.logger.info("首帧验证图像已保存") #'images\\经典-B20-8220\\20250228\\00\\first_frame_20250228000708.952_0.jpg'
-
+            path = os.path.join('images', f'{self.table_data["name"].replace(" ", "-")}-{self.table_data["table_id"]}', f'FF_{formatted_time}.jpg')
+            pil_img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            pil_img.save(path)  # 使用PIL库保存可避免OpenCV路径问题
+            self.logger.info(f"首帧验证图像已保存:{path}")
     def _trigger_callback(self, all_sub_images: List[List[np.ndarray]],labels:List):
         """触发图像就绪回调"""
         if self.on_image_ready:
@@ -239,7 +262,6 @@ class RegionCaptureProcessor:
                 image1, image2 = sub_images[0], sub_images[1]
                 white_ratio1 = self._get_white_ratio(image1)
                 white_ratio2 = self._get_white_ratio(image2)
-
                 card_front1, card_front2 = self.check_card_background(self.status, white_ratio1, white_ratio2, image1,
                                                                       image2)
                 if not card_front1 or not card_front2:
@@ -316,6 +338,9 @@ class RegionCaptureProcessor:
         else:
             subfolder_path = os.path.join(image_folder, date_str, hour_str)
         os.makedirs(subfolder_path, exist_ok=True)
+        if not os.path.exists(subfolder_path):
+            self.logger.error(f"目录创建失败: {subfolder_path}")
+            return None, None
         return subfolder_path,formatted_time
     def save_images(self,poker1,poker2):
         if self.to_be_save_images:
@@ -325,7 +350,9 @@ class RegionCaptureProcessor:
             for sub_images in self.to_be_save_images:
                 index += 1
                 image1, image2 = sub_images[0], sub_images[1]
-                cv2.imwrite(f'{subfolder_path}\\{poker1.classic}_{formatted_time}_{index}.jpg', image1)
-                cv2.imwrite(f'{subfolder_path}\\{poker2.classic}_{formatted_time}_{index}.jpg', image2)
+                pil_img = Image.fromarray(cv2.cvtColor(image1, cv2.COLOR_BGR2RGB))
+                pil_img.save(f'{subfolder_path}\\{poker1.classic}_{formatted_time}_{index}.jpg')
+                pil_img2 = Image.fromarray(cv2.cvtColor(image2, cv2.COLOR_BGR2RGB))
+                pil_img2.save(f'{subfolder_path}\\{poker2.classic}_{formatted_time}_{index}.jpg')
             self.to_be_save_images.clear()
 

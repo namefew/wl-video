@@ -1,4 +1,5 @@
 # video_ui.py
+import json
 import os
 import queue
 import threading
@@ -17,15 +18,12 @@ logger = LogManager.setup()
 
 # video_ui.py
 class VideoUI:
-    def __init__(self, tables=None):
+    def __init__(self):
         self.root = tk.Tk()
         self.root.title("WL-Video")
         self.root.geometry("400x300+100+100")  # 固定窗口大小
         self.root.configure(bg='#2c3e50')  # 添加背景色
 
-        # 初始化桌台数据
-        self.tables = [table['name'] for table in tables] if tables else []
-        self.tables_config = tables
 
         # 创建工具栏
         self.create_toolbar()
@@ -62,9 +60,10 @@ class VideoUI:
         # 标签：请选择桌台
         label_table = ttk.Label(toolbar, text="桌台:", font=('Arial', 10), background='#34495e', foreground='white')
         label_table.pack(side=tk.LEFT, padx=5, pady=5)
-
+        config = self.load_config()
+        tables = [table['name'] for table in config]
         # 下拉选择框：tables
-        self.table_combobox = ttk.Combobox(toolbar, values=self.tables, width=10)
+        self.table_combobox = ttk.Combobox(toolbar, values=tables, width=10)
         self.table_combobox.pack(side=tk.LEFT, padx=5, pady=5)
         self.table_combobox.bind("<<ComboboxSelected>>", self.update_links)
 
@@ -83,7 +82,8 @@ class VideoUI:
     def update_links(self, event):
         """更新视频流选择框"""
         table_name = self.table_combobox.get()
-        selected_table = next((table for table in self.tables_config if table['name'] == table_name), None)
+        config = self.load_config()
+        selected_table = next((table for table in config if table['name'] == table_name), None)
         if selected_table:
             links = selected_table["links"]
             self.link_combobox['values'] = [link["type"] if "type" in link else link["url"] for link in links]
@@ -230,6 +230,11 @@ class VideoUI:
             safe_images = [np.copy(img) for img in sub_imgs]
             self.update_images(safe_images)
 
+    def load_config(self,config_path='config.json'):
+        with open(config_path, 'r', encoding='utf-8') as file:
+            config = json.load(file)
+        return config['tables']
+
     def start_run(self, table_name, link_type):
         self.image_update_thread = threading.Thread(target=self._image_update_loop, daemon=True)
         self.image_update_thread.start()
@@ -250,7 +255,8 @@ class VideoUI:
 
     def _start_run(self, table_name, link_type):
         logger.info("启动流媒体处理器...")
-        selected_table = next((table for table in self.tables_config if table['name'] == table_name), None)
+        config = self.load_config()
+        selected_table = next((table for table in config if table['name'] == table_name), None)
         if selected_table:
             selected_link = next((link for link in selected_table["links"] if link.get("type") == link_type or link["url"] == link_type), None)
             if selected_link:
