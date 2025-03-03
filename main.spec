@@ -5,7 +5,9 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[(r'.venv_vedio\Lib\site-packages\wasmtime\win32-x86_64\_wasmtime.dll','wasmtime/win32-x86_64'),
+    (r'.venv_vedio\Lib\site-packages\wasmtime\**','wasmtime')
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
