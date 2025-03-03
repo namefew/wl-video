@@ -114,7 +114,7 @@ class bt:
             return
         try:
             self.logger.info(f"Starting to read stream from {url}")
-            response = requests.get(url, stream=True)
+            response = requests.get(url, stream=True,timeout=10)
             response.raise_for_status()
 
             for chunk in response.iter_content(chunk_size=4096 * 4):
