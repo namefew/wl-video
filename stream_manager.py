@@ -128,6 +128,10 @@ class bt:
             self.logger.error(f"Error reading stream from {url}: {e}")
             self.clear_data()  # 清空数据
             self.reconnect(url)  # 重新连接
+        except requests.exceptions.Timeout:
+            self.logger.error(f"Timeout while reading stream from {url}")
+            self.clear_data()  # 清空数据
+            self.reconnect(url)  # 重新连接
     def stop(self):
         self.running = False
         self.clear_data()
