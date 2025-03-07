@@ -1,9 +1,9 @@
+import asyncio
 import shutil
 from datetime import datetime
 import os
 import socket
 from concurrent.futures import ThreadPoolExecutor
-from PIL import Image
 import cv2
 import numpy as np
 import logging
@@ -22,11 +22,6 @@ class RegionCaptureProcessor:
                  on_image_ready: Optional[Callable[[dict], None]] = None,
                  logger: Optional[logging.Logger] = None,confidence_threshold=0.99,
                  table_data = None):
-        """
-        :param regions: 截取区域列表，格式 [(x, y, width, height), ...]
-        :param on_image_ready: 图像处理完成回调函数
-        :param logger: 日志记录器
-        """
         self.regions = regions
         self.on_image_ready = on_image_ready
         self.logger = logger or logging.getLogger(__name__)
@@ -47,6 +42,7 @@ class RegionCaptureProcessor:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.to_be_save_images = []
         self.table_data = table_data
+        self.websocket_client = None
 
     def _get_red_ratio(self, image, lower_red1=(0, 100, 100), upper_red1=(10, 255, 255),
                        lower_red2=(160, 100, 100), upper_red2=(180, 255, 255)):
@@ -280,7 +276,6 @@ class RegionCaptureProcessor:
                         self.recongnize_cnt = 0;
                     predicted_class1, confidence1, predicted_class2, confidence2 = self.detect_images(
                         image1, image2)
-                    detection_time = time.time()
                     poker1 = Poker(predicted_class1)
                     poker2 = Poker(predicted_class2)
 
@@ -321,6 +316,13 @@ class RegionCaptureProcessor:
         start = time.time()
         message = f"{self.table_data['table_id']},{card1_index},{card2_index},{self.table_data['name']},{start}"
 
+        if self.websocket_client and self.websocket_client.connected:
+            try:
+                self.websocket_client.send(message)
+                self.logger.info(f"WS发消息: {message}")
+            except Exception as e:
+                self.logger.error(f"Failed to send WebSocket message: {e}")
+
         self.sock.sendto(message.encode(), ('<broadcast>', port))
         self.logger.info(f"广播消息: {message}")
 
@@ -355,4 +357,7 @@ class RegionCaptureProcessor:
                 pil_img2 = Image.fromarray(cv2.cvtColor(image2, cv2.COLOR_BGR2RGB))
                 pil_img2.save(f'{subfolder_path}\\{poker2.classic}_{formatted_time}_{index}.jpg')
             self.to_be_save_images.clear()
+
+    def set_websocket_client(self, websocket_client):
+        self.websocket_client = websocket_client
 

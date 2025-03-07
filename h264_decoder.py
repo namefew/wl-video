@@ -36,20 +36,15 @@ class H264Decoder:
                 'surfaces': '8',  # 显存中解码表面数量
                 'deint': 'adaptive',  # 反交错模式
                 'cudacache': '1',  # 启用CUDA缓存
+                'cuda_ctx': '1',  # 显式启用CUDA上下文
                 'nvdec_preserve': '1',  # 保留显存优化
                 'threads': '4',  # 解码线程数（建议为GPU流处理器数/8）
                 'delay': '0',  # 零延迟模式
-                'flags': '+low_delay+fast'  # 低延迟+快速解码标志
-            }
-            # Windows需添加的专用参数
-            self._parser.options.update({
-                'gpu': '0',
-                'cuda_ctx': '1',  # 显式启用CUDA上下文
-                'delay': '0',
-                'flags': '+low_delay+auto_alt_ref',  # Windows专用低延迟模式
+                'flags': '+low_delay',  # 低延迟+快速解码标志
                 'output_format': 'cuda',  # 强制CUDA输出格式
                 'hwaccel_output_format': 'cuda'  # 硬件加速输出格式
-            })
+            }
+
             # 调整解码参数（在init_decoder方法中）
             self._parser.options.update({
                 'surfaces': '4',  # 减少显存占用
@@ -57,12 +52,12 @@ class H264Decoder:
                 'max_width': '1920',  # 限制最大分辨率
                 'max_height': '1080'
             })
-            # 添加低延迟优化参数
-            self._parser.options.update({
-                'flags': '+low_delay+zerolatency+nonstrict',
-                'strict': 'experimental',
-                'max_delay': '1000000'  # 1秒最大延迟
-            })
+            # # 添加低延迟优化参数
+            # self._parser.options.update({
+            #     'flags': '+low_delay+zerolatency+nonstrict',
+            #     'strict': 'experimental',
+            #     'max_delay': '1000000'  # 1秒最大延迟
+            # })
 
             self._is_hw_accel = True
             self.logger.info(f"成功启用NVIDIA硬件解码器，配置参数：{self._parser.options}")

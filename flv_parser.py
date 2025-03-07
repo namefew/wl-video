@@ -1,9 +1,6 @@
 import struct
-import subprocess
-import time
 from concurrent.futures import ThreadPoolExecutor
 
-import cv2
 import numpy as np
 
 from amf_parser import parse_script
@@ -134,6 +131,8 @@ class FLVParser:  #ht
         )
         self.executor = ThreadPoolExecutor(max_workers=2)  # 双线程解码
 
+    def set_websocket_client(self, websocket_client):
+        self.image_processor.set_websocket_client(websocket_client)
     def _init_decoder(self):
         """替换原来的初始化逻辑"""
         self.decoder.init_decoder(
