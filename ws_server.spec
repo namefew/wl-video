@@ -2,12 +2,10 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['websocket_server.py'],
     pathex=[],
     binaries=[],
-    datas=[(r'.venv\Lib\site-packages\wasmtime\win32-x86_64\_wasmtime.dll','wasmtime/win32-x86_64'),
-    (r'.venv\Lib\site-packages\wasmtime\**','wasmtime')
-    ],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -24,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='video',
+    name='ws-server',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -36,6 +34,5 @@ exe = EXE(
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
-    entitlements_file=None,
-    icon='icon.ico'
+    entitlements_file=None
 )
