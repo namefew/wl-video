@@ -285,8 +285,7 @@ class RegionCaptureProcessor:
                         self.logger.info(f"牌1: {poker1.card} [{confidence1:.4f}]  - 牌2: {poker2.card} [{confidence2:.4f}] ")
                         # self.logger.info(f"识别图耗时: {(detection_time - start_time) * 1000:.2f} 毫秒")
                         # self.logger.info(f"总处理耗时: {(time.time() - start_time) * 1000:.2f} 毫秒")
-                        if time.time() - self.first_card_back_time[0] < 20.0 and time.time() - \
-                                self.first_card_back_time[1] < 20:
+                        if time.time() - self.first_card_back_time[0] < 26.0 and time.time()-self.first_card_back_time[1] < 26:
                             self.take_action(poker1, poker2)
                         else:
                             self.logger.warning("时间太长，不广播消息")

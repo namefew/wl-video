@@ -14,6 +14,7 @@ import cv2
 
 from logger import LogManager
 from stream_manager import bt
+from config import load_config
 
 logger = LogManager.setup()
 
@@ -52,6 +53,7 @@ class VideoUI:
         # 图像更新线程
         self.image_update_thread = None
         self.image_update_queue = Queue()
+        self.last_label = ["", ""]
 
     def create_toolbar(self):
         """创建工具栏"""
@@ -61,7 +63,7 @@ class VideoUI:
         # 标签：请选择桌台
         label_table = ttk.Label(toolbar, text="桌台:", font=('Arial', 10), background='#34495e', foreground='white')
         label_table.pack(side=tk.LEFT, padx=5, pady=5)
-        config = self.load_config()
+        config = load_config()['tables']
         tables = [table['name'] for table in config]
         # 下拉选择框：tables
         self.table_combobox = ttk.Combobox(toolbar, values=tables, width=10)
@@ -84,7 +86,7 @@ class VideoUI:
     def update_links(self, event):
         """更新视频流选择框"""
         table_name = self.table_combobox.get()
-        config = self.load_config()
+        config = load_config()['tables']
         selected_table = next((table for table in config if table['name'] == table_name), None)
         if selected_table:
             links = selected_table["links"]
@@ -225,17 +227,16 @@ class VideoUI:
             return
         if len(event['labels']) != 2:
             return
+        if not load_config()['show_all']:
+            if event['labels'][0]==self.last_label[0] and event['labels'][1]==self.last_label[1]:
+                return
+        self.last_label = event['labels']
         self.update_labels(event['labels'][0], event['labels'][1])
         for i in range(len(event['images'])):
             sub_imgs = event['images'][i]
             # 显式拷贝图像数据
             safe_images = [np.copy(img) for img in sub_imgs]
             self.update_images(safe_images)
-
-    def load_config(self,config_path='config.json'):
-        with open(config_path, 'r', encoding='utf-8') as file:
-            config = json.load(file)
-        return config['tables']
 
     def start_run(self, table_name, link_type):
         self.image_update_thread = threading.Thread(target=self._image_update_loop, daemon=True)
@@ -257,7 +258,7 @@ class VideoUI:
 
     def _start_run(self, table_name, link_type):
         logger.info("启动流媒体处理器...")
-        config = self.load_config()
+        config = load_config()['tables']
         selected_table = next((table for table in config if table['name'] == table_name), None)
         if selected_table:
             selected_link = next((link for link in selected_table["links"] if link.get("type") == link_type or link["url"] == link_type), None)

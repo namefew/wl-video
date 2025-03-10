@@ -1,4 +1,6 @@
 {
+	"hw_accel": 0,
+	"show_all":1,
 	"tables": [{
 		"table_id": 8201,
 		"name": "极速 B01",
@@ -337,7 +339,7 @@
 	},
 	{
 		"table_id": 8215,
-		"name": "急速 B15",
+		"name": "极速 B15",
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B15_2.flv",
@@ -351,7 +353,7 @@
 	},
 	{
 		"table_id": 8216,
-		"name": "急速 B16",
+		"name": "极速 B16",
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B16_2.flv",
@@ -383,7 +385,7 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B18_2.flv",
-			"regions": [[397, 828, 82, 82], [483, 827, 82, 82]]
+			"regions": [[380, 828, 82, 82], [465, 827, 82, 82]]
 		},
 		{
 			"type": "高清 720P",
@@ -425,12 +427,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B21_2.flv",
-			"regions": [[400, 798, 82, 82], [482, 798, 82, 82]]
+			"regions": [[384, 802, 82, 82], [466, 802, 82, 82]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B21_2_l.flv",
-			"regions": [[266, 532, 56, 56], [322, 532, 56, 56]]
+			"regions": [[254, 532, 56, 56], [310, 532, 56, 56]]
 		}]
 	},
 	{
@@ -439,12 +441,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B22_2.flv",
-			"regions": [[343, 817, 86, 90], [432, 817, 86, 90]]
+			"regions": [[345, 811, 86, 90], [435, 813, 86, 90]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B22_2_l.flv",
-			"regions": [[228, 546, 56, 58], [288, 546, 56, 58]]
+			"regions": [[230, 540, 56, 58], [292, 540, 56, 58]]
 		}]
 	},
 	{
@@ -453,12 +455,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B23_2.flv",
-			"regions": [[385, 818, 86, 88], [472, 818, 86, 88]]
+			"regions": [[379, 818, 86, 88], [466, 818, 86, 88]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B23_2_l.flv",
-			"regions": [[257, 544, 56, 58], [316, 544, 56, 58]]
+			"regions": [[250, 546, 56, 58], [311, 546, 56, 58]]
 		}]
 	},
 	{
@@ -467,12 +469,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B24_2.flv",
-			"regions": [[376, 817, 84, 86], [458, 817, 84, 86]]
+			"regions": [[385, 817, 84, 86], [471, 817, 84, 86]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B24_2_l.flv",
-			"regions": [[248, 544, 56, 58], [306, 544, 56, 58]]
+			"regions": [[258, 544, 56, 58], [314, 544, 56, 58]]
 		}]
 	},
 	{
@@ -481,12 +483,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B25_2.flv",
-			"regions": [[376, 820, 84, 86], [466, 820, 84, 86]]
+			"regions": [[360, 826, 84, 86], [450, 826, 84, 86]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl2079.gslxqy.com/live/v2flv_B25_2_l.flv",
-			"regions": [[250, 548, 56, 56], [310, 548, 56, 56]]
+			"regions": [[240, 551, 56, 56], [300, 552, 56, 56]]
 		}]
 	},
 	{
@@ -495,12 +497,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B26_2.flv",
-			"regions": [[398, 818, 86, 88], [487, 818, 86, 88]]
+			"regions": [[420, 820, 86, 88], [514, 820, 86, 88]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B26_2_l.flv",
-			"regions": [[266, 548, 56, 56], [324, 548, 56, 56]]
+			"regions": [[282, 548, 56, 56], [342, 548, 56, 56]]
 		}]
 	},
 	{
@@ -509,12 +511,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B27_2.flv",
-			"regions": [[364, 802, 86, 86], [454, 802, 86, 86]]
+			"regions": [[384, 858, 86, 86], [474, 858, 86, 86]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B27_2_l.flv",
-			"regions": [[244, 534, 56, 58], [302, 534, 56, 58]]
+			"regions": [[258, 570, 56, 58], [318, 569, 56, 58]]
 		}]
 	},
 	{
@@ -523,12 +525,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B28_2.flv",
-			"regions": [[366, 818, 86, 86], [458, 818, 86, 86]]
+			"regions": [[372, 820, 86, 86], [463, 822, 86, 86]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B28_2_l.flv",
-			"regions": [[246, 546, 56, 58], [306, 546, 56, 58]]
+			"regions": [[249, 547, 56, 58], [310, 547, 56, 58]]
 		}]
 	},
 	{
@@ -537,12 +539,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B29_2.flv",
-			"regions": [[396, 818, 86, 86], [484, 818, 86, 86]]
+			"regions": [[409, 822, 86, 86], [499, 822, 86, 86]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B29_2_l.flv",
-			"regions": [[263, 546, 56, 58], [323, 546, 56, 58]]
+			"regions": [[274, 546, 56, 58], [331, 546, 56, 58]]
 		}]
 	},
 	{
@@ -551,12 +553,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B30_2.flv",
-			"regions": [[364, 824, 84, 84], [452, 824, 84, 84]]
+			"regions": [[370, 824, 86, 86], [463, 824, 86, 86]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B30_2_l.flv",
-			"regions": [[263, 544, 56, 58], [323, 544, 56, 58]]
+			"regions": [[250, 550, 56, 58], [311, 550, 56, 58]]
 		}]
 	},
 	{
@@ -565,12 +567,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B31_2.flv",
-			"regions": [[381, 825, 86, 86], [468, 826, 86, 86]]
+			"regions": [[368, 825, 86, 86], [454, 826, 86, 86]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B31_2_l.flv",
-			"regions": [[252, 549, 56, 58], [311, 550, 56, 58]]
+			"regions": [[242, 549, 56, 58], [301, 550, 56, 58]]
 		}]
 	},
 	{
@@ -579,12 +581,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B32_2.flv",
-			"regions": [[390, 805, 86, 86], [478, 805, 86, 86]]
+			"regions": [[409, 805, 86, 86], [497, 805, 86, 86]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B32_2_l.flv",
-			"regions": [[260, 537, 56, 56], [318, 537, 56, 56]]
+			"regions": [[274, 537, 56, 58], [333, 537, 56, 58]]
 		}]
 	},
 	{
@@ -593,12 +595,12 @@
 		"links": [{
 			"type": "超清 1080P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B33_2.flv",
-			"regions":  [[372, 828, 82, 82], [463, 830, 82, 82]]
+			"regions":  [[382, 828, 84, 84], [476, 830, 84, 84]]
 		},
 		{
 			"type": "高清 720P",
 			"url": "https://pl5719.vvvbao.com/live/v1flv_B33_2_l.flv",
-			"regions": [[248, 552, 56, 56], [308, 554, 56, 56]]
+			"regions": [[256, 550, 56, 58], [316, 550, 56, 58]]
 		}]
 	}
 

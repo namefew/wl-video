@@ -5,6 +5,9 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Optional
 
+from config import load_config
+
+
 class H264Decoder:
     """异步H264解码器（事件驱动模式）"""
     def __init__(self, 
@@ -25,62 +28,16 @@ class H264Decoder:
 
     def init_decoder(self, sps: bytes, pps: bytes, width: int, height: int):
         """初始化解码器"""
+        json = load_config()
+
         try:
-            # 硬件解码器配置
-            codec = av.Codec('h264_cuvid', 'r')
-            self._parser = av.CodecContext.create(codec)
-
-            # 硬件加速关键参数
-            self._parser.options = {
-                'gpu': '0',  # 指定GPU设备编号
-                'surfaces': '8',  # 显存中解码表面数量
-                'deint': 'adaptive',  # 反交错模式
-                'cudacache': '1',  # 启用CUDA缓存
-                'cuda_ctx': '1',  # 显式启用CUDA上下文
-                'nvdec_preserve': '1',  # 保留显存优化
-                'threads': '4',  # 解码线程数（建议为GPU流处理器数/8）
-                'delay': '0',  # 零延迟模式
-                'flags': '+low_delay',  # 低延迟+快速解码标志
-                'output_format': 'cuda',  # 强制CUDA输出格式
-                'hwaccel_output_format': 'cuda'  # 硬件加速输出格式
-            }
-
-            # 调整解码参数（在init_decoder方法中）
-            self._parser.options.update({
-                'surfaces': '4',  # 减少显存占用
-                'gpu_copy': '1',  # 启用显存到内存拷贝
-                'max_width': '1920',  # 限制最大分辨率
-                'max_height': '1080'
-            })
-            # # 添加低延迟优化参数
-            # self._parser.options.update({
-            #     'flags': '+low_delay+zerolatency+nonstrict',
-            #     'strict': 'experimental',
-            #     'max_delay': '1000000'  # 1秒最大延迟
-            # })
-
-            self._is_hw_accel = True
-            self.logger.info(f"成功启用NVIDIA硬件解码器，配置参数：{self._parser.options}")
-
+            # self.init_soft_decoder()
+            if json['hw_accel']:
+                self.init_hardware_decoder()
+            else:
+                self.init_soft_decoder()
         except Exception as e:
-            self.logger.warning(f"硬件解码初始化失败，回撤到软件解码")
-            codec = av.Codec('h264', 'r')
-            self._parser = av.CodecContext.create(codec)
-            self._parser.options = {
-                'threads': '4',  # 自动检测CPU核心数
-                'flags': '+low_delay',
-                'refs': '1',  # 减少参考帧数
-                'err_detect': 'ignore_err',
-                'enable': 'fast'  # 启用快速解码模式
-            }
-            self._parser.options.update({
-                'skip_frame': 'default',  # 跳过非关键帧的解码
-                'skip_loop_filter': 'all',  # 关闭环路滤波
-                'error_resilient': '1',  # 增强容错能力
-                'max_pixel': '2.5',  # 限制像素计算复杂度
-                'lowres': '0'  # 保持原始分辨率但要确认是否可降级
-            })
-            self._is_hw_accel = False
+            self.init_soft_decoder()
 
         # 构建extradata
         extradata = bytes([0x01]) + sps[1:4]
@@ -92,6 +49,53 @@ class H264Decoder:
         self._parser.extradata = extradata
         self._parser.width = width
         self._parser.height = height
+
+    def init_hardware_decoder(self):
+        # 硬件解码器配置
+        codec = av.Codec('h264_cuvid', 'r')
+        self._parser = av.CodecContext.create(codec)
+        # 硬件加速关键参数
+        self._parser.options = {
+            'gpu': '0',  # 指定GPU设备编号
+            'surfaces': '8',  # 显存中解码表面数量
+            'deint': 'adaptive',  # 反交错模式
+            'cudacache': '1',  # 启用CUDA缓存
+            'cuda_ctx': '1',  # 显式启用CUDA上下文
+            'nvdec_preserve': '1',  # 保留显存优化
+            'threads': '32',  # 解码线程数（建议为GPU流处理器数/8）
+            'delay': '0',  # 零延迟模式
+            'flags': '+low_delay',  # 低延迟+快速解码标志
+            'output_format': 'cuda',  # 强制CUDA输出格式
+            'hwaccel_output_format': 'cuda'  # 硬件加速输出格式
+        }
+        # 调整解码参数（在init_decoder方法中）
+        self._parser.options.update({
+            'gpu_copy': '0',  # 启用显存到内存拷贝
+            'output_format': 'rgb24',  # 直接输出CPU可读格式
+            'hwaccel_output_format': 'nv12'  # 使用硬件原生格式
+        })
+        self._is_hw_accel = True
+        self.logger.info(f"成功启用NVIDIA硬件解码器，配置参数：{self._parser.options}")
+
+    def init_soft_decoder(self):
+        self.logger.warning(f"硬件解码初始化失败，回撤到软件解码")
+        codec = av.Codec('h264', 'r')
+        self._parser = av.CodecContext.create(codec)
+        self._parser.options = {
+            'threads': '4',  # 自动检测CPU核心数
+            'flags': '+low_delay',
+            'refs': '1',  # 减少参考帧数
+            'err_detect': 'ignore_err',
+            'enable': 'fast'  # 启用快速解码模式
+        }
+        self._parser.options.update({
+            'skip_frame': 'default',  # 跳过非关键帧的解码
+            'skip_loop_filter': 'all',  # 关闭环路滤波
+            'error_resilient': '1',  # 增强容错能力
+            'max_pixel': '2.5',  # 限制像素计算复杂度
+            'lowres': '0'  # 保持原始分辨率但要确认是否可降级
+        })
+        self._is_hw_accel = False
 
     def async_decode(self, nalu_data: bytes):
         """提交异步解码任务"""

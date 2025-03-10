@@ -141,6 +141,8 @@ class bt:
 
     def direct_stream_reader(self, url):
         if not self.running:
+            if self.ws and self.ws.connected:
+                self.ws.close()
             return
         try:
             self.logger.info(f"Starting to read stream from {url}")
@@ -168,6 +170,8 @@ class bt:
             self.reconnect(url)  # 重新连接
     def stop(self):
         self.running = False
+        if self.ws and self.ws.connected:
+            self.ws.close()
         self.clear_data()
         self.logger.info("处理视频流已被终止！！")
     def clear_data(self):
