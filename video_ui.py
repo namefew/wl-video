@@ -1,6 +1,4 @@
 # video_ui.py
-import asyncio
-import json
 import os
 import queue
 import threading
