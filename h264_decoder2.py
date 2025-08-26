@@ -1,94 +1,223 @@
-# import time
-# from concurrent.futures import ThreadPoolExecutor
-#
-# import PyNvCodec as nvc
-# import numpy as np
-# from typing import Callable, Optional
-#
-# class H264Decoder2:
-#     def __init__(self,
-#                  logger,
-#                  on_decoded: Callable[[list[np.ndarray]], None],
-#                  on_error: Optional[Callable[[Exception], None]] = None):
-#         self.logger = logger
-#         self._on_decoded = on_decoded
-#         self._on_error = on_error
-#         self._executor = ThreadPoolExecutor(max_workers=1)
-#         self._decoder = None
-#         self._gpu_id = 0
-#         self._frame_buffer = nvc.PyFrameUploader(1920, 1080, nvc.PixelFormat.RGB_PLANAR, self._gpu_id)
-#
-#     def init_decoder(self, sps: bytes, pps: bytes, width: int, height: int):
-#         """实时流解码器初始化"""
-#         try:
-#             # 构造extradata (VPF要求格式)
-#             extradata = self._build_extradata(sps, pps)
-#
-#             # 创建低延迟解码器
-#             self._decoder = nvc.PyNvDecoder(
-#                 width,
-#                 height,
-#                 nvc.PixelFormat.NV12,  # 硬件解码原生格式
-#                 self._gpu_id,
-#                 {'codec': 'h264', 's': f'{width}x{height}', 'low_latency': '1'}
-#             )
-#             self._decoder.SetDecodeParams({
-#                 'num_decode_surfaces': '4',  # 减少显存占用
-#                 'num_output_surfaces': '2',  # 输出缓冲
-#                 'gpu_rate_control': '1',  # GPU频率提升
-#                 'zero_copy': '1',  # 零拷贝模式
-#                 'max_delay': '1000',  # 1ms最大延迟
-#                 'flags': '+low_delay+zerolatency'
-#             })
-#             # 配置实时流参数
-#             self._decoder.SetReconnectParams(3, 5000)  # 3次重连，间隔5秒
-#             self._decoder.SetFrameRate(30)  # 预期帧率
-#
-#             self.logger.info("NVIDIA硬件解码器初始化成功（实时流模式）")
-#
-#         except Exception as e:
-#             self.logger.error(f"解码器初始化失败: {str(e)}")
-#             raise
-#
-#     def async_decode(self, nalu_data: bytes):
-#         """提交实时流解码任务"""
-#         def _wrap_packet():
-#             try:
-#                 # 添加H264起始码
-#                 wrapped_data = b'\x00\x00\x00\x01' + nalu_data
-#
-#                 # 创建VPF兼容的数据包
-#                 enc_packet = nvc.PacketData()
-#                 enc_packet.data = wrapped_data
-#                 enc_packet.pts = int(time.time() * 1e6)  # 使用时间戳
-#
-#                 # 硬件解码
-#                 raw_frame = np.ndarray(shape=(1080,1920,3), dtype=np.uint8)
-#                 success = self._decoder.DecodeFrameFromPacket(raw_frame, enc_packet)
-#
-#                 if success:
-#                     # GPU->CPU异步传输
-#                     self._frame_buffer.Upload(raw_frame)
-#                     return [self._frame_buffer.Download()]
-#                 return []
-#
-#             except Exception as e:
-#                 self._handle_error(e)
-#                 return []
-#
-#         future = self._executor.submit(_wrap_packet)
-#         future.add_done_callback(
-#             lambda f: self._on_decoded(f.result())
-#         )
-#
-#     def _build_extradata(self, sps, pps):
-#         """构建VPF要求的extradata格式"""
-#         return b''.join([
-#             bytes([0x01]), sps[1:4],
-#             bytes([0xff, 0xe1]),
-#             len(sps).to_bytes(2, 'big'), sps,
-#             bytes([0x01]),
-#             len(pps).to_bytes(2, 'big'), pps
-#         ])
-#
-#     # 其他方法保持原有逻辑...
+import struct
+import threading
+import time
+import tkinter as tk
+from concurrent.futures import ThreadPoolExecutor
+
+from PIL import Image, ImageTk
+import av
+import cv2
+import numpy as np
+import requests
+
+
+class VideoDecoder:
+    def __init__(self, on_frame_decoded):
+        self._codec_ctx = None
+        self.on_frame_decoded = on_frame_decoded
+        self._executor = ThreadPoolExecutor(max_workers=1)
+        self.sps = None
+        self.pps = None
+
+    def init_decoder(self, sps, pps):
+        # 构建extradata (AVCDecoderConfigurationRecord)
+        extradata = bytes([0x01]) + sps[1:4]
+        extradata += bytes([0xff, 0xe1])
+        extradata += len(sps).to_bytes(2, 'big') + sps
+        extradata += bytes([0x01])
+        extradata += len(pps).to_bytes(2, 'big') + pps
+
+        try:
+            # 优先尝试硬件解码
+            codec = av.Codec('h264_cuvid', 'r')
+            self._codec_ctx = av.CodecContext.create(codec)
+            self._codec_ctx.options = {
+                'gpu': '0',
+                'output_format': 'bgr24',
+                'flags': '+low_delay'
+            }
+            print("Hardware decoder initialized successfully")
+        except Exception as e:
+            print("Hardware decoder failed:", str(e))
+            # 回退到软件解码
+            codec = av.Codec('h264', 'r')
+            self._codec_ctx = av.CodecContext.create(codec)
+
+        self._codec_ctx.extradata = extradata
+        self._codec_ctx.open(codec)
+
+    def decode_nalu(self, nalu_data):
+        if not self._codec_ctx:
+            return
+
+        def _decode():
+            try:
+                packets = self._codec_ctx.parse(nalu_data)
+                frames = []
+                for packet in packets:
+                    decoded = self._codec_ctx.decode(packet)
+                    frames.extend([f.to_ndarray(format='bgr24') for f in decoded])
+
+                if frames:
+                    self.on_frame_decoded(frames)
+            except Exception as e:
+                print(f"解码错误: {str(e)}")
+
+        self._executor.submit(_decode)
+
+
+class FLVPlayer:
+    def __init__(self, url):
+        self.root = tk.Tk()
+        self.root.title("FLV实时播放器")
+        self.video_label = tk.Label(self.root)
+        self.video_label.pack()
+
+        self.decoder = VideoDecoder(self._update_ui)
+        self.buffer = bytearray()
+        self.running = True
+        self.lock = threading.Lock()
+        self.last_frame_time = 0
+        self.has_skipped_flv_header = False
+
+        # 启动网络线程
+        threading.Thread(target=self._fetch_stream, args=(url,), daemon=True).start()
+        self.root.mainloop()
+
+    def _fetch_stream(self, url):
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            }
+            with requests.get(url, headers=headers, stream=True, timeout=5) as res:
+                print(f"Response status: {res.status_code}")
+                for chunk in res.iter_content(40960):
+                    if not self.running:
+                        break
+                    print(f"Received chunk of size: {len(chunk)}")
+                    self._parse_flv(chunk)
+        except Exception as e:
+            print(f"网络错误: {str(e)}")
+            self._shutdown()
+
+    def _parse_flv(self, data):
+        with self.lock:
+            self.buffer.extend(data)
+
+            # Step 1: Skip FLV Header
+            if not self.has_skipped_flv_header:
+                if len(self.buffer) >= 9:
+                    flv_header = self.buffer[:9]
+                    if flv_header[0] == 70 and flv_header[1] == 76 and flv_header[2] == 86:
+                        del self.buffer[:9]
+                        self.has_skipped_flv_header = True
+                    else:
+                        print("Invalid FLV header")
+                        self.buffer.clear()
+                        return
+                else:
+                    return
+
+            while len(self.buffer) >= 11:
+                # Step 2: Resync if invalid tag type
+                if self.buffer[0] not in (8, 9, 18):
+                    self.buffer.pop(0)
+                    continue
+
+                header = self.buffer[:11]
+                tag_type = header[0]
+                data_size = struct.unpack('>I', b'\x00' + header[1:4])[0]
+                total_size = data_size + 15
+
+                if len(self.buffer) < total_size + 4:
+                    break
+
+                # Step 3: Validate PreviousTagSize
+                prev_tag_size = struct.unpack('>I', self.buffer[total_size:total_size+4])[0]
+                if prev_tag_size != data_size + 11:
+                    print("PreviousTagSize mismatch, possible data corruption")
+                    self.buffer.pop(0)
+                    continue
+
+                tag_data = self.buffer[11:11 + data_size]
+                del self.buffer[:total_size + 4]
+
+                if tag_type == 9:
+                    print(f"Processing video tag of size: {data_size}")
+                    self._process_video(tag_data)
+
+    def _process_video(self, data):
+        avc_type = data[0]
+        print(f"AVC Type: {avc_type}")
+        if avc_type == 0:
+            print("Parsing AVCDecoderConfigurationRecord")
+            self._parse_avcc(data[5:])
+        elif avc_type == 1:
+            print("Processing NALUs")
+            self._process_nalus(data[5:])
+        else:
+            print(f"未知的 AVC 类型: {avc_type}")
+
+    def _parse_avcc(self, data):
+        sps_count = data[5] & 0x1f
+        pos = 6
+        for _ in range(sps_count):
+            sps_len = struct.unpack('>H', data[pos:pos + 2])[0]
+            self.sps = data[pos + 2:pos + 2 + sps_len]
+            pos += 2 + sps_len
+
+        pps_count = data[pos]
+        pos += 1
+        for _ in range(pps_count):
+            pps_len = struct.unpack('>H', data[pos:pos + 2])[0]
+            self.pps = data[pos + 2:pos + 2 + pps_len]
+            pos += 2 + pps_len
+
+        if self.sps and self.pps:
+            self.decoder.init_decoder(self.sps, self.pps)
+
+    def _process_nalus(self, data):
+        def safe_split_nalus(data):
+            start_code = b'\x00\x00\x00\x01'
+            pos = 0
+            while pos < len(data):
+                idx = data.find(start_code, pos)
+                if idx == -1:
+                    break
+                next_idx = data.find(start_code, idx + 4)
+                end = next_idx if next_idx != -1 else len(data)
+                yield data[idx:end]
+                pos = end
+
+        for nalu in safe_split_nalus(data):
+            if len(nalu) > 4:
+                self.decoder.decode_nalu(nalu)
+
+    def _update_ui(self, frames):
+        now = time.time()
+        if now - self.last_frame_time < 0.033:  # ~30fps
+            return
+
+        self.last_frame_time = now
+        if frames:
+            print("Updating UI with new frame")
+            self.root.after(0, self._show_frame, frames[0])
+
+    def _show_frame(self, frame):
+        try:
+            img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img = Image.fromarray(img).resize((1280, 720))
+            imgtk = ImageTk.PhotoImage(image=img)
+            self.video_label.configure(image=imgtk)
+            self.video_label.image = imgtk
+            print("Frame displayed successfully")
+        except Exception as e:
+            print(f"显示错误: {str(e)}")
+
+    def _shutdown(self):
+        self.running = False
+        self.root.destroy()
+
+
+if __name__ == "__main__":
+    FLVPlayer("https://pu300.bighit888.com/livestream/dtg01-1.flv")

@@ -27,11 +27,12 @@ class WebSocketServer:
             logging.info(f"New client connected: {websocket.remote_address}, total {len(self.clients)}")
         try:
             async for message in websocket:
-                if websocket in self.clients:
-                    self.clients.remove(websocket)
-                    self.sent_clients.add(websocket)
-                logging.info(f"Received message from [{websocket.remote_address}]: {message}")
-                await self.broadcast(message, exclude=[websocket])
+                logging.info(f"Received message: {message}  from:[{websocket.remote_address}]:")
+                if not message.startswith('{') and not message.endswith('}'):
+                    if websocket in self.clients:
+                        self.clients.remove(websocket)
+                        self.sent_clients.add(websocket)
+                    await self.broadcast(message, exclude=[websocket])
         except websockets.exceptions.ConnectionClosedError:
             pass
         except Exception as e:
@@ -57,12 +58,38 @@ class WebSocketServer:
                 oldest_key = next(iter(self.messages))
                 del self.messages[oldest_key]
 
+    # 在WebSocketServer类中添加以下方法
+    async def udp_listener(self):
+        class UDPProtocol:
+            def __init__(self, server):
+                self.server = server
+
+            def connection_made(self, transport):
+                self.transport = transport
+
+            def datagram_received(self, data, addr):
+                message = data.decode()
+                logging.info(f"Received UDP message from {addr}: {message}")
+                # 创建任务异步处理消息
+                asyncio.create_task(self.server.broadcast(message))
+
+        loop = asyncio.get_running_loop()
+        await loop.create_datagram_endpoint(
+            lambda: UDPProtocol(self),
+            local_addr=('0.0.0.0', 5005)
+        )
+        logging.info(f"UDP listener started on port 5005")
+
+    # 修改start方法
     async def start(self):
         async with websockets.serve(self.handler, "0.0.0.0", self.port):
             logging.info(f"WebSocket server started on port {self.port}")
+            # 启动UDP监听
+            await self.udp_listener()
             await asyncio.Future()  # 永久运行
 
     def validate(self, message):
+
         key, timestamp = message.rsplit(',', 1)  # 从右侧分割一次
         timestamp = float(timestamp)
         if key in self.messages:
